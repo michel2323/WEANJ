@@ -169,4 +169,7 @@ def scaling_plot(example: str, metric: str = "grad_s", title: str | None = None,
                   labels={"grad_s": "gradient time [s]", "forward_s": "forward time [s]",
                           "peak_mem_bytes": "memory [bytes]",
                           **({x: x_label} if x_label else {})})
-    return fig
+    # Plotly's default output loads its own MathJax 3, which conflicts with the MathJax
+    # Quarto loads for the page, and then no formula on the page is typeset.
+    from IPython.display import HTML
+    return HTML(fig.to_html(full_html=False, include_plotlyjs="cdn", include_mathjax=False))

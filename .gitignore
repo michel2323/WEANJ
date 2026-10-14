@@ -1,0 +1,12 @@
+/.quarto/
+/_site/
+/python/.venv/
+__pycache__/
+*.pyc
+_environment.local
+/smoke/*_files/
+
+**/*.quarto_ipynb
+/_*.local
+.claude/settings.local.json
+/.vscode/

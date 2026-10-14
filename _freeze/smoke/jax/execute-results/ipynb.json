@@ -1,0 +1,12 @@
+{
+  "hash": "d4ef676c0e6df4ae0b36892fee560ac5",
+  "result": {
+    "engine": "jupyter",
+    "markdown": "---\ntitle: \"Smoke: JAX\"\njupyter: python3\n---\n\n::: {#cell-grad .cell execution_count=1}\n``` {}\n#| label: grad\nimport os\nos.environ.setdefault(\"XLA_PYTHON_CLIENT_PREALLOCATE\", \"false\")\nimport jax, jax.numpy as jnp\nprint(jax.devices())\njax.grad(lambda x: jnp.sum(jnp.sort(x) ** 2))(jnp.array([3., 1., 4., 2.]))\n```\n\n::: {.cell-output .cell-output-stdout}\n```\n[CudaDevice(id=0)]\n```\n:::\n\n::: {#grad .cell-output .cell-output-display execution_count=1}\n```\nArray([6., 2., 8., 4.], dtype=float32)\n```\n:::\n:::\n\n\n---\njupyter:\n  kernelspec:\n    display_name: Python 3 (ipykernel)\n    language: python\n    name: python3\n    path: /home/mschanen/git/WEANJ/python/.venv/share/jupyter/kernels/python3\n  language_info:\n    codemirror_mode:\n      name: ipython\n      version: 3\n    file_extension: .py\n    mimetype: text/x-python\n    name: python\n    nbconvert_exporter: python\n    pygments_lexer: ipython3\n    version: 3.12.13\n---\n",
+    "supporting": [
+      "jax_files"
+    ],
+    "filters": [],
+    "includes": {}
+  }
+}

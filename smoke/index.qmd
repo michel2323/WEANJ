@@ -1,0 +1,15 @@
+---
+title: "Toolchain check"
+subtitle: "A one-line gradient with each tool, to verify your setup"
+---
+
+::: {.panel-tabset group="impl"}
+## Enzyme.jl
+{{< embed enzyme.qmd#grad echo=true >}}
+
+## Reactant.jl
+{{< embed reactant.qmd#grad echo=true >}}
+
+## JAX
+{{< embed jax.qmd#grad echo=true >}}
+:::

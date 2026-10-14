@@ -1,0 +1,33 @@
+---
+title: "NN. Title — JAX"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+import weanj  # sets XLA_PYTHON_CLIENT_PREALLOCATE=false before JAX initialises
+import jax, jax.numpy as jnp
+jax.config.update("jax_enable_x64", True)
+EXAMPLE = "NN-name"
+inputs = weanj.load_inputs(EXAMPLE)
+```
+
+```{python}
+#| label: loss
+# def loss(theta, inputs): ...
+```
+
+```{python}
+#| label: grad
+# g = jax.grad(loss)(theta0, inputs)   # Float64
+```
+
+```{python}
+#| label: check
+# weanj.fd_check(lambda t: loss(t, inputs), theta0, g); weanj.save_gradient(EXAMPLE, "jax", g)
+```
+
+```{python}
+#| label: bench
+# weanj.write_results(EXAMPLE, "jax", "gpu", records)
+```

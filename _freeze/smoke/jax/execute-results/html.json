@@ -1,0 +1,12 @@
+{
+  "hash": "d4ef676c0e6df4ae0b36892fee560ac5",
+  "result": {
+    "engine": "jupyter",
+    "markdown": "---\ntitle: \"Smoke: JAX\"\njupyter: python3\n---\n\n::: {#cell-grad .cell execution_count=1}\n``` {.python .cell-code}\nimport os\nos.environ.setdefault(\"XLA_PYTHON_CLIENT_PREALLOCATE\", \"false\")\nimport jax, jax.numpy as jnp\nprint(jax.devices())\njax.grad(lambda x: jnp.sum(jnp.sort(x) ** 2))(jnp.array([3., 1., 4., 2.]))\n```\n\n::: {.cell-output .cell-output-stdout}\n```\n[CudaDevice(id=0)]\n```\n:::\n\n::: {#grad .cell-output .cell-output-display execution_count=1}\n```\nArray([6., 2., 8., 4.], dtype=float32)\n```\n:::\n:::\n\n\n",
+    "supporting": [
+      "jax_files"
+    ],
+    "filters": [],
+    "includes": {}
+  }
+}

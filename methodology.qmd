@@ -1,0 +1,51 @@
+---
+title: "Methodology"
+---
+
+How the comparisons are made, so they can be checked and reproduced.
+
+## Same inputs
+
+Inputs for each example are generated once in Julia with a fixed seed and written to
+`data/<example>.npz`. All three implementations load that file.
+
+## Same gradient
+
+Every implementation computes the gradient of the same loss at the same point in
+**Float64** and saves it to `benchmarks/grads/<example>_<impl>.npz`. Each example page
+checks that
+
+1. every gradient agrees with central finite differences on a few random components, and
+2. all three gradients agree with each other (relative tolerance 1e-8).
+
+A failing check fails the build, so a published page always shows matching gradients.
+
+## Timing
+
+- Timing runs use **Float32**, as is usual on GPUs; the correctness check uses Float64.
+- Compile time (first call) is reported separately from run time. It matters for JAX and
+  Reactant, which compile a whole graph, and for Enzyme, which compiles on first call.
+- Run time is the median of 10 calls after 2 warm-up calls. GPU work is synchronised
+  inside the timed region (`CUDA.synchronize`, `jax.block_until_ready`).
+- Problem size *N* is swept over several orders of magnitude so scaling is visible, not
+  just one data point.
+- Peak device memory is reported where the tool exposes it.
+- Benchmarks run on an otherwise idle GPU (`make gpu-check` refuses to run otherwise).
+
+## Fairness rules for the JAX column
+
+The JAX code is what a competent JAX user would write, not a literal translation:
+
+- `jax.jit` everything, donate buffers where it helps, and use `jax.checkpoint` where a
+  practitioner would.
+- Use the ecosystem's own tools where they exist: jax-md cell and neighbour lists,
+  Optimistix for implicit differentiation, Diffrax for adaptive time stepping.
+- Where JAX needs a static capacity (padding), size it from the data and handle overflow
+  the way jax-md does, and report the padding overhead.
+- Every example page has a **"Where JAX wins / what we did not do"** note.
+
+## Hardware and software
+
+Results on the published site were produced on an NVIDIA RTX 5000 Ada Generation Laptop
+GPU (16 GB), Julia 1.12, Enzyme.jl 0.13, Reactant.jl 0.2, JAX 0.11 (CUDA 13). Exact
+versions are pinned in `julia/Manifest.toml` and `python/uv.lock`.

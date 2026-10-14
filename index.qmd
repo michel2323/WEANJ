@@ -1,0 +1,56 @@
+---
+title: "Why Enzyme and not JAX?"
+subtitle: "Differentiating programs whose efficient form is irregular"
+---
+
+::: {.callout-note}
+Work in progress. The examples are being added one at a time; see the
+[project plan](https://github.com/michel2323/WEANJ/blob/main/AGENTS.md).
+:::
+
+"Why do you use Julia instead of JAX?" is a fair question, and "JAX can't sort" is the
+wrong answer: `jax.lax.sort` is differentiable. The real difference is the
+**execution model**.
+
+JAX differentiates *pure functions over fixed-shape arrays with a static computation
+graph*. Anything that fits that model runs well, often better than hand-written code,
+because XLA fuses and vectorises it. [Enzyme](https://enzyme.mit.edu) differentiates
+*the imperative program as written*, including in-place mutation, data-dependent loop
+bounds and growing buffers. When an algorithm's efficient form is **irregular**, JAX
+makes you regularise it with padding, masks, static trip counts or implicit
+differentiation. Enzyme lets you keep it.
+
+Each example below implements the same loss three times, with Enzyme.jl, with
+[Reactant.jl](https://github.com/EnzymeAD/Reactant.jl), and with JAX, checks that all
+three give the same gradient, and times them on a CUDA GPU. Reactant is the control: it
+is Julia compiled through XLA, the same static-graph model as JAX. Where Reactant hits
+the same wall as JAX, the cause is the execution model, not the language.
+
+## Where the gap shows up
+
+**Data-dependent output size or sparsity**
+: Compaction and filtering (`x[mask]`, `push!`), sparse assembly with data-dependent
+  fill-in, contact detection, tree codes (octrees, Barnes–Hut). JAX needs a static upper
+  bound and masks.
+
+**Data-dependent control flow**
+: Iterative solvers with convergence tests, adaptive time stepping. JAX cannot
+  reverse-differentiate `lax.while_loop`, so you fix the iteration count or switch to
+  implicit differentiation.
+
+**Sequential in-place updates**
+: Gauss–Seidel, SOR, Thomas algorithm, sweeps where element *i* depends on the
+  just-updated *i−1*. In JAX these become `lax.scan` with the whole array as carry, and
+  reverse mode stores every carry unless you rematerialise.
+
+**Irregular neighbour access**
+: Particle methods with cell lists (sort by cell, loop over a data-dependent number of
+  neighbours), scatter-accumulate with data-dependent indices, histogramming, resampling.
+
+## Where JAX wins
+
+Dense, batched, regular work: most of machine learning, many PDE stencils, anything
+whose naive cost already equals its smart cost. There the regularised JAX version is
+often faster despite padding, because XLA fuses and the hardware wants regular access.
+And the advantage on this site is **Enzyme's**, not Julia's: Julia AD tools that do not
+support mutation (Zygote) cannot do this either.

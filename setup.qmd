@@ -1,0 +1,56 @@
+---
+title: "Run it yourself"
+---
+
+Every page on this site is built from notebooks you can run on your own CUDA GPU.
+
+## Requirements
+
+- Linux with an NVIDIA GPU and a recent driver (tested: driver 580, CUDA 13.0)
+- [juliaup](https://github.com/JuliaLang/juliaup) (the project pins Julia 1.12)
+- [uv](https://docs.astral.sh/uv/) for the Python/JAX environment
+- [Quarto](https://quarto.org/docs/get-started/) ≥ 1.10
+- `make`
+
+## Install
+
+```bash
+git clone https://github.com/michel2323/WEANJ
+cd WEANJ
+make setup
+```
+
+`make setup` installs the Julia 1.12 channel, instantiates and precompiles the Julia
+environment in `julia/` (Enzyme, Reactant, CUDA), creates the Python environment in
+`python/` (JAX with CUDA 13), and writes `_environment.local` so Quarto uses that
+Python. The first run downloads several GB and takes 10–15 minutes.
+
+## Check the toolchain
+
+```bash
+quarto render smoke/
+```
+
+This runs a tiny gradient on the GPU with each of the three tools. Open
+`_site/smoke/index.html`; all three tabs should show output.
+
+## Run the examples
+
+```bash
+quarto preview                      # browse the site, edit and re-run notebooks live
+quarto render examples/01-particles/enzyme.qmd   # re-run one notebook
+make run-gpu                        # re-run everything; refreshes _freeze/ and benchmarks/
+```
+
+Rendering a single notebook always executes it. Rendering the whole site uses the frozen
+outputs in `_freeze/`, so it does not need a GPU.
+
+## Troubleshooting
+
+**JAX prints `CUDA_ERROR_OUT_OF_MEMORY`**
+: Another process is using the GPU. The notebooks disable JAX's up-front memory
+  reservation, but benchmark numbers are only meaningful on an idle GPU:
+  `make gpu-check` lists what is running.
+
+**Julia version mismatch**
+: The notebooks start Julia with `julia +1.12`. Run `juliaup add 1.12`.

@@ -1,0 +1,32 @@
+project:
+  type: website
+  output-dir: _site
+  render:
+    - "*.qmd"
+    - "examples/**/*.qmd"
+    - "smoke/*.qmd"
+
+execute:
+  freeze: true
+
+website:
+  title: "WEANJ"
+  description: "Why Enzyme And Not JAX: differentiating irregular programs"
+  repo-url: https://github.com/michel2323/WEANJ
+  repo-actions: [source, issue]
+  sidebar:
+    style: docked
+    contents:
+      - index.qmd
+      - methodology.qmd
+      - setup.qmd
+      - smoke/index.qmd
+
+format:
+  html:
+    theme:
+      light: cosmo
+      dark: darkly
+    toc: true
+    code-copy: true
+    code-overflow: wrap

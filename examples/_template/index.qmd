@@ -1,0 +1,54 @@
+---
+title: "NN. Title"
+description: "One sentence: which irregularity this example shows."
+jupyter: python3
+---
+
+<!-- Copy this folder to examples/NN-name/, set EXAMPLE below and in the three
+     source notebooks, and fill in each section. -->
+
+## The problem
+
+What is being computed, the loss, and which part of the efficient algorithm is
+irregular (data-dependent shape / control flow / sequential in-place update).
+
+## Code
+
+::: {.panel-tabset group="impl"}
+## Enzyme.jl
+{{< embed enzyme.qmd#loss echo=true >}}
+{{< embed enzyme.qmd#grad echo=true >}}
+
+## Reactant.jl
+{{< embed reactant.qmd#loss echo=true >}}
+{{< embed reactant.qmd#grad echo=true >}}
+
+## JAX
+{{< embed jax.qmd#loss echo=true >}}
+{{< embed jax.qmd#grad echo=true >}}
+:::
+
+## Same gradient from all three
+
+```{python}
+#| label: check
+#| echo: false
+import weanj
+EXAMPLE = "NN-name"
+weanj.compare_gradients(EXAMPLE)
+```
+
+## Timings
+
+```{python}
+#| label: timings
+#| echo: false
+weanj.scaling_plot(EXAMPLE, "grad_s", "Gradient time vs problem size")
+```
+
+## Where JAX wins / what we did not do
+
+::: {.callout-note}
+Be specific: which JAX formulation was used, what it costs, and what a JAX expert
+could do instead (custom kernel, different algorithm).
+:::

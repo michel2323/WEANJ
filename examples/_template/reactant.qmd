@@ -1,0 +1,34 @@
+---
+title: "NN. Title — Reactant"
+engine: julia
+julia:
+  exeflags: ["+1.12", "--project=../../julia"]
+---
+
+```{julia}
+#| label: setup
+using WEANJ
+const EXAMPLE = "NN-name"
+inputs = load_inputs(EXAMPLE)
+```
+
+```{julia}
+#| label: loss
+# loss(θ, inputs) = ...
+```
+
+```{julia}
+#| label: grad
+# g = gradient of loss at the shared point, Float64
+```
+
+```{julia}
+#| label: check
+# fd_check(θ -> loss(θ, inputs), θ0, g); save_gradient(EXAMPLE, "reactant", g)
+```
+
+```{julia}
+#| label: bench
+# records = [(dtype="Float32", N=N, forward_s=..., grad_s=..., compile_s=..., peak_mem_bytes=...) for N in Ns]
+# write_results(EXAMPLE, "reactant", "gpu", records)
+```

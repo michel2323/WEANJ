@@ -1,0 +1,13 @@
+---
+title: "Smoke: JAX"
+jupyter: python3
+---
+
+```{python}
+#| label: grad
+import os
+os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
+import jax, jax.numpy as jnp
+print(jax.devices())
+jax.grad(lambda x: jnp.sum(jnp.sort(x) ** 2))(jnp.array([3., 1., 4., 2.]))
+```

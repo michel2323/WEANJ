@@ -1,0 +1,135 @@
+---
+title: "03. Compaction and scatter-add — JAX"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+import functools
+import numpy as np
+import weanj  # sets XLA_PYTHON_CLIENT_PREALLOCATE=false before JAX initialises
+import jax
+import jax.numpy as jnp
+
+jax.config.update("jax_enable_x64", True)
+EXAMPLE = "03-compaction"
+T, DT, HW, NB = 50, 0.01, 0.005, 1024  # steps, time step, window half-width, bins
+d = weanj.load_inputs(EXAMPLE)
+x0, v0, target0 = (jnp.asarray(d[k]) for k in ("x0", "v", "target"))
+```
+
+```{python}
+#| label: loss
+def minimg(d):
+    return d - jnp.round(d)
+
+def taper(d):
+    return jnp.maximum(1.0 - jnp.abs(d) / HW, 0.0) ** 2
+
+def deposit(H, x, w):
+    """Cloud-in-cell scatter-add into the histogram."""
+    g = x * NB - 0.5
+    j = jnp.floor(g).astype(jnp.int32)
+    f = g - j
+    return H.at[j % NB].add(w * (1 - f)).at[(j + 1) % NB].add(w * f)
+
+# Masked: every particle is deposited at every step, with weight 0 outside the window.
+@jax.jit
+def loss_masked(x0, v, target):
+    def step(H, t):
+        x = x0 + v * (t * DT)
+        d = minimg(x - t / T)
+        w = jnp.where(jnp.abs(d) < HW, taper(d), 0.0)
+        return deposit(H, x - jnp.floor(x), w), None
+    H, _ = jax.lax.scan(step, jnp.zeros(NB, x0.dtype), jnp.arange(1, T + 1))
+    return jnp.sum((H - target) ** 2)
+
+# Compacted: the closest JAX gets to x[mask]. `nonzero` needs a static `size`, so the
+# selection is padded to a capacity chosen from the data, checked outside jit.
+@functools.partial(jax.jit, static_argnums=3)
+def loss_compact(x0, v, target, cap):
+    n = x0.shape[0]
+    def step(H, t):
+        inside = jnp.abs(minimg(x0 + v * (t * DT) - t / T)) < HW
+        idx = jnp.nonzero(inside, size=cap, fill_value=n)[0]
+        i = jnp.minimum(idx, n - 1)
+        x = x0[i] + v[i] * (t * DT)
+        w = jnp.where(idx < n, taper(minimg(x - t / T)), 0.0)
+        return deposit(H, x - jnp.floor(x), w), None
+    H, _ = jax.lax.scan(step, jnp.zeros(NB, x0.dtype), jnp.arange(1, T + 1))
+    return jnp.sum((H - target) ** 2)
+
+def needed_capacity(x0, v):
+    """Largest number of selected particles at any step (host-side, outside jit)."""
+    t = np.arange(1, T + 1)[:, None]
+    d = np.asarray(x0)[None] + np.asarray(v)[None] * t * DT - t / T
+    return int((np.abs(d - np.round(d)) < HW).sum(axis=1).max())
+```
+
+```{python}
+#| label: grad
+grad_masked = jax.jit(jax.grad(loss_masked))
+grad_compact = jax.jit(jax.grad(loss_compact), static_argnums=3)
+
+cap0 = needed_capacity(x0, v0)
+g = grad_compact(x0, v0, target0, cap0)
+print(f"capacity = {cap0}   loss = {float(loss_compact(x0, v0, target0, cap0)):.10f}   "
+      f"‖∇loss‖ = {float(jnp.linalg.norm(g)):.6f}")
+```
+
+```{python}
+#| label: check
+gm = grad_masked(x0, v0, target0)
+assert float(jnp.max(jnp.abs(gm - g)) / jnp.max(jnp.abs(g))) < 1e-10
+err = weanj.fd_check(lambda y: loss_compact(jnp.asarray(y), v0, target0, cap0), np.asarray(x0), np.asarray(g), n=20, h=1e-7)
+weanj.save_gradient(EXAMPLE, "jax", np.asarray(g))
+print(f"finite differences: max rel. error {err:.1e} on 20 components; masked = compacted")
+```
+
+```{python}
+#| label: bench
+import time
+
+Ns = [10**4, 10**5, 10**6, 10**7]
+
+def inputs(n, seed=1):
+    rng = np.random.default_rng(seed)
+    return (jnp.asarray(rng.random(n)), jnp.asarray(0.5 * rng.standard_normal(n)),
+            jnp.asarray(0.01 * rng.random(NB)))
+
+for device in ("cpu", "gpu"):
+    records = []
+    with jax.default_device(jax.devices(device)[0]):
+        for variant in ("masked", "compacted"):
+            for N in Ns:
+                x, v, tg = inputs(N)
+                if variant == "masked":
+                    args = (x, v, tg)
+                    loss, grad, gfn = (lambda: loss_masked(x, v, tg)), (lambda: grad_masked(x, v, tg)), grad_masked
+                else:
+                    cap = needed_capacity(x, v)  # recompiles when the capacity changes
+                    args = (x, v, tg, cap)
+                    loss, grad, gfn = (lambda: loss_compact(x, v, tg, cap)), (lambda: grad_compact(x, v, tg, cap)), grad_compact
+                # XLA's scratch memory for the gradient: reverse mode through the scan
+                # keeps per-step residuals.
+                mem = int(gfn.lower(*args).compile().memory_analysis().temp_size_in_bytes)
+                r = dict(dtype="Float64", variant=variant, N=N, compile_s=None,
+                         peak_mem_bytes=mem, forward_s=None, grad_s=None, error=None)
+                samples = 3 if N >= 10**6 else 10
+                try:
+                    t0 = time.perf_counter()
+                    jax.block_until_ready(grad())
+                    r["compile_s"] = time.perf_counter() - t0
+                    r["forward_s"] = weanj.time_median(loss, sync=jax.block_until_ready, samples=samples)
+                    r["grad_s"] = weanj.time_median(grad, sync=jax.block_until_ready, samples=samples)
+                except jax.errors.JaxRuntimeError as err:  # out of device memory
+                    r["error"] = str(err).split("[")[0].strip()
+                records.append(r)
+    weanj.write_results(EXAMPLE, "jax", device, records)
+    for r in records:
+        if r["error"]:
+            print(f"{device} {r['variant']:<9} N={r['N']:<9d} {r['error']}")
+        else:
+            print(f"{device} {r['variant']:<9} N={r['N']:<9d} forward {1e3*r['forward_s']:9.3f} ms   "
+                  f"gradient {1e3*r['grad_s']:9.3f} ms   XLA temp {r['peak_mem_bytes']/2**20:9.1f} MiB")
+```

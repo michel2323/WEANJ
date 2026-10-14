@@ -2,46 +2,86 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://michel2323.github.io/WEANJ/smoke/reactant.html</loc>
-    <lastmod>2026-10-14T15:29:03.836Z</lastmod>
+    <lastmod>2026-10-14T20:01:40.396Z</lastmod>
   </url>
   <url>
     <loc>https://michel2323.github.io/WEANJ/smoke/index.html</loc>
-    <lastmod>2026-10-14T15:29:03.836Z</lastmod>
+    <lastmod>2026-10-14T20:01:40.396Z</lastmod>
   </url>
   <url>
     <loc>https://michel2323.github.io/WEANJ/setup.html</loc>
-    <lastmod>2026-10-14T15:29:03.836Z</lastmod>
+    <lastmod>2026-10-14T20:01:40.395Z</lastmod>
   </url>
   <url>
     <loc>https://michel2323.github.io/WEANJ/index.html</loc>
-    <lastmod>2026-10-14T15:29:03.834Z</lastmod>
+    <lastmod>2026-10-14T20:01:40.393Z</lastmod>
+  </url>
+  <url>
+    <loc>https://michel2323.github.io/WEANJ/examples/04-newton/index.html</loc>
+    <lastmod>2026-10-14T20:01:40.393Z</lastmod>
+  </url>
+  <url>
+    <loc>https://michel2323.github.io/WEANJ/examples/03-compaction/jax.html</loc>
+    <lastmod>2026-10-14T20:01:40.393Z</lastmod>
+  </url>
+  <url>
+    <loc>https://michel2323.github.io/WEANJ/examples/03-compaction/enzyme.html</loc>
+    <lastmod>2026-10-14T20:01:40.393Z</lastmod>
+  </url>
+  <url>
+    <loc>https://michel2323.github.io/WEANJ/examples/02-gauss-seidel/jax.html</loc>
+    <lastmod>2026-10-14T20:01:40.392Z</lastmod>
+  </url>
+  <url>
+    <loc>https://michel2323.github.io/WEANJ/examples/02-gauss-seidel/enzyme.html</loc>
+    <lastmod>2026-10-14T20:01:40.392Z</lastmod>
   </url>
   <url>
     <loc>https://michel2323.github.io/WEANJ/examples/01-particles/jax.html</loc>
-    <lastmod>2026-10-14T15:29:03.833Z</lastmod>
+    <lastmod>2026-10-14T20:01:40.392Z</lastmod>
   </url>
   <url>
     <loc>https://michel2323.github.io/WEANJ/examples/01-particles/enzyme.html</loc>
-    <lastmod>2026-10-14T15:29:03.833Z</lastmod>
+    <lastmod>2026-10-14T20:01:40.392Z</lastmod>
   </url>
   <url>
     <loc>https://michel2323.github.io/WEANJ/examples/01-particles/index.html</loc>
-    <lastmod>2026-10-14T15:29:03.833Z</lastmod>
+    <lastmod>2026-10-14T20:01:40.392Z</lastmod>
   </url>
   <url>
     <loc>https://michel2323.github.io/WEANJ/examples/01-particles/reactant.html</loc>
-    <lastmod>2026-10-14T15:29:03.833Z</lastmod>
+    <lastmod>2026-10-14T20:01:40.392Z</lastmod>
+  </url>
+  <url>
+    <loc>https://michel2323.github.io/WEANJ/examples/02-gauss-seidel/index.html</loc>
+    <lastmod>2026-10-14T20:01:40.392Z</lastmod>
+  </url>
+  <url>
+    <loc>https://michel2323.github.io/WEANJ/examples/02-gauss-seidel/reactant.html</loc>
+    <lastmod>2026-10-14T20:01:40.392Z</lastmod>
+  </url>
+  <url>
+    <loc>https://michel2323.github.io/WEANJ/examples/03-compaction/index.html</loc>
+    <lastmod>2026-10-14T20:01:40.393Z</lastmod>
+  </url>
+  <url>
+    <loc>https://michel2323.github.io/WEANJ/examples/04-newton/enzyme.html</loc>
+    <lastmod>2026-10-14T20:01:40.393Z</lastmod>
+  </url>
+  <url>
+    <loc>https://michel2323.github.io/WEANJ/examples/04-newton/jax.html</loc>
+    <lastmod>2026-10-14T20:01:40.393Z</lastmod>
   </url>
   <url>
     <loc>https://michel2323.github.io/WEANJ/methodology.html</loc>
-    <lastmod>2026-10-14T15:29:03.834Z</lastmod>
+    <lastmod>2026-10-14T20:01:40.394Z</lastmod>
   </url>
   <url>
     <loc>https://michel2323.github.io/WEANJ/smoke/enzyme.html</loc>
-    <lastmod>2026-10-14T15:29:03.836Z</lastmod>
+    <lastmod>2026-10-14T20:01:40.396Z</lastmod>
   </url>
   <url>
     <loc>https://michel2323.github.io/WEANJ/smoke/jax.html</loc>
-    <lastmod>2026-10-14T15:29:03.836Z</lastmod>
+    <lastmod>2026-10-14T20:01:40.396Z</lastmod>
   </url>
 </urlset>

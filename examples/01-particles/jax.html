@@ -350,6 +350,24 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="menu-text">01. Particles: sort, cell lists, and data-dependent neighbour loops</span></a>
   </div>
 </li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../examples/02-gauss-seidel/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">02. Gauss–Seidel: a sequential in-place sweep</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../examples/03-compaction/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">03. Compaction and scatter-add: work proportional to the data</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../examples/04-newton/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">04. Newton’s method: a loop that stops when it has converged</span></a>
+  </div>
+</li>
       </ul>
   </li>
         <li class="sidebar-item">
@@ -484,7 +502,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> positions(n, seed<span class="op">=</span><span class="dv">1</span>):</span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    rng <span class="op">=</span> np.random.default_rng(seed)</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (rng.random((n, <span class="dv">2</span>)) <span class="op">*</span> box_size(n)).astype(np.float32)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (rng.random((n, <span class="dv">2</span>)) <span class="op">*</span> box_size(n)).astype(np.float64)</span>
 <span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>Ns <span class="op">=</span> [<span class="dv">10</span><span class="op">**</span><span class="dv">3</span>, <span class="dv">10</span><span class="op">**</span><span class="dv">4</span>, <span class="dv">10</span><span class="op">**</span><span class="dv">5</span>, <span class="dv">10</span><span class="op">**</span><span class="dv">6</span>]</span>
 <span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> device <span class="kw">in</span> (<span class="st">"cpu"</span>, <span class="st">"gpu"</span>):</span>
@@ -492,30 +510,43 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">with</span> jax.default_device(jax.devices(device)[<span class="dv">0</span>]):</span>
 <span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> N <span class="kw">in</span> Ns:</span>
 <span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>            x <span class="op">=</span> jnp.asarray(positions(N))</span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>            t0 <span class="op">=</span> time.perf_counter()</span>
-<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>            P <span class="op">=</span> Particles(x)</span>
-<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>            jax.block_until_ready(P.grad(x))</span>
-<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>            compile_s <span class="op">=</span> time.perf_counter() <span class="op">-</span> t0</span>
-<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>            samples <span class="op">=</span> <span class="dv">3</span> <span class="cf">if</span> N <span class="op">&gt;=</span> <span class="dv">10</span><span class="op">**</span><span class="dv">5</span> <span class="cf">else</span> <span class="dv">10</span></span>
-<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>            records.append(<span class="bu">dict</span>(</span>
-<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>                dtype<span class="op">=</span><span class="st">"Float32"</span>, N<span class="op">=</span>N,</span>
-<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>                forward_s<span class="op">=</span>weanj.time_median(<span class="kw">lambda</span>: P.loss(x), sync<span class="op">=</span>jax.block_until_ready, samples<span class="op">=</span>samples),</span>
-<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>                grad_s<span class="op">=</span>weanj.time_median(<span class="kw">lambda</span>: P.grad(x), sync<span class="op">=</span>jax.block_until_ready, samples<span class="op">=</span>samples),</span>
-<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>                compile_s<span class="op">=</span>compile_s, peak_mem_bytes<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>                slots<span class="op">=</span><span class="bu">int</span>(P.nbrs.idx.shape[<span class="dv">1</span>])))</span>
-<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>    weanj.write_results(EXAMPLE, <span class="st">"jax"</span>, device, records)</span>
-<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> r <span class="kw">in</span> records:</span>
-<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>device<span class="sc">}</span><span class="ss">  N=</span><span class="sc">{</span>r[<span class="st">'N'</span>]<span class="sc">:&lt;8d}</span><span class="ss"> forward </span><span class="sc">{</span><span class="fl">1e3</span><span class="op">*</span>r[<span class="st">'forward_s'</span>]<span class="sc">:9.3f}</span><span class="ss"> ms   "</span></span>
-<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>              <span class="ss">f"gradient </span><span class="sc">{</span><span class="fl">1e3</span><span class="op">*</span>r[<span class="st">'grad_s'</span>]<span class="sc">:9.3f}</span><span class="ss"> ms   compile </span><span class="sc">{</span>r[<span class="st">'compile_s'</span>]<span class="sc">:5.1f}</span><span class="ss"> s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>            r <span class="op">=</span> <span class="bu">dict</span>(dtype<span class="op">=</span><span class="st">"Float64"</span>, N<span class="op">=</span>N, forward_s<span class="op">=</span><span class="va">None</span>, grad_s<span class="op">=</span><span class="va">None</span>, compile_s<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>                     peak_mem_bytes<span class="op">=</span><span class="va">None</span>, slots<span class="op">=</span><span class="va">None</span>, error<span class="op">=</span><span class="va">None</span>)</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>            <span class="cf">try</span>:</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>                t0 <span class="op">=</span> time.perf_counter()</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>                P <span class="op">=</span> Particles(x)</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>                jax.block_until_ready(P.grad(x))</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>                r[<span class="st">"compile_s"</span>] <span class="op">=</span> time.perf_counter() <span class="op">-</span> t0</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>                samples <span class="op">=</span> <span class="dv">3</span> <span class="cf">if</span> N <span class="op">&gt;=</span> <span class="dv">10</span><span class="op">**</span><span class="dv">5</span> <span class="cf">else</span> <span class="dv">10</span></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>                r[<span class="st">"forward_s"</span>] <span class="op">=</span> weanj.time_median(<span class="kw">lambda</span>: P.loss(x), sync<span class="op">=</span>jax.block_until_ready, samples<span class="op">=</span>samples)</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>                r[<span class="st">"grad_s"</span>] <span class="op">=</span> weanj.time_median(<span class="kw">lambda</span>: P.grad(x), sync<span class="op">=</span>jax.block_until_ready, samples<span class="op">=</span>samples)</span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>                r[<span class="st">"slots"</span>] <span class="op">=</span> <span class="bu">int</span>(P.nbrs.idx.shape[<span class="dv">1</span>])</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>            <span class="cf">except</span> jax.errors.JaxRuntimeError <span class="im">as</span> err:  <span class="co"># out of device memory</span></span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>                r[<span class="st">"error"</span>] <span class="op">=</span> <span class="bu">str</span>(err).split(<span class="st">"["</span>)[<span class="dv">0</span>].strip()</span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>            records.append(r)</span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>            P <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>    weanj.write_results(EXAMPLE, <span class="st">"jax"</span>, device, records)</span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> r <span class="kw">in</span> records:</span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> r[<span class="st">"error"</span>]:</span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>device<span class="sc">}</span><span class="ss">  N=</span><span class="sc">{</span>r[<span class="st">'N'</span>]<span class="sc">:&lt;8d}</span><span class="ss"> </span><span class="sc">{</span>r[<span class="st">'error'</span>]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>device<span class="sc">}</span><span class="ss">  N=</span><span class="sc">{</span>r[<span class="st">'N'</span>]<span class="sc">:&lt;8d}</span><span class="ss"> forward </span><span class="sc">{</span><span class="fl">1e3</span><span class="op">*</span>r[<span class="st">'forward_s'</span>]<span class="sc">:9.3f}</span><span class="ss"> ms   "</span></span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>                  <span class="ss">f"gradient </span><span class="sc">{</span><span class="fl">1e3</span><span class="op">*</span>r[<span class="st">'grad_s'</span>]<span class="sc">:9.3f}</span><span class="ss"> ms   compile </span><span class="sc">{</span>r[<span class="st">'compile_s'</span>]<span class="sc">:5.1f}</span><span class="ss"> s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>cpu  N=1000     forward     5.548 ms   gradient     6.054 ms   compile   2.0 s
-cpu  N=10000    forward    50.708 ms   gradient    55.273 ms   compile   1.9 s
-cpu  N=100000   forward   390.929 ms   gradient   439.905 ms   compile   2.6 s
-cpu  N=1000000  forward  4309.714 ms   gradient  4606.089 ms   compile  11.6 s
-gpu  N=1000     forward     1.172 ms   gradient     1.254 ms   compile   3.2 s
-gpu  N=10000    forward     1.332 ms   gradient     1.446 ms   compile   3.9 s
-gpu  N=100000   forward     4.149 ms   gradient     6.443 ms   compile   4.0 s
-gpu  N=1000000  forward    38.210 ms   gradient    61.814 ms   compile   4.9 s</code></pre>
+<pre><code>cpu  N=1000     forward     6.456 ms   gradient     6.935 ms   compile   1.9 s
+cpu  N=10000    forward    67.202 ms   gradient    70.843 ms   compile   1.9 s
+cpu  N=100000   forward   572.637 ms   gradient   560.776 ms   compile   2.7 s
+cpu  N=1000000  forward  5464.442 ms   gradient  5980.907 ms   compile  13.9 s
+gpu  N=1000     forward     1.382 ms   gradient     1.419 ms   compile   3.1 s
+gpu  N=10000    forward     1.613 ms   gradient     2.082 ms   compile   3.7 s
+gpu  N=100000   forward     6.925 ms   gradient    10.267 ms   compile   3.9 s
+gpu  N=1000000  RESOURCE_EXHAUSTED: Out of memory while trying to allocate 4.07GiB with allocator GPU_0_bfc on device 0.</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>W1014 14:36:04.848233   27507 bfc_allocator.cc:598] Allocator (GPU_0_bfc) ran out of memory trying to allocate 4.07GiB (rounded to 4367252992) from the lower end requested by op 
+If this is caused by memory fragmentation, the environment variable 'TF_GPU_ALLOCATOR=cuda_malloc_async' may improve the situation.
+Current allocation summary follows.
+W1014 14:36:04.848580   27507 bfc_allocator.cc:609] *___****____________________________________________________***x___________________________________*</code></pre>
 </div>
 </div>
 

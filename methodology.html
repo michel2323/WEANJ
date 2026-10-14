@@ -313,6 +313,24 @@ ul.task-list li input[type="checkbox"] {
  <span class="menu-text">01. Particles: sort, cell lists, and data-dependent neighbour loops</span></a>
   </div>
 </li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./examples/02-gauss-seidel/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">02. Gauss–Seidel: a sequential in-place sweep</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./examples/03-compaction/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">03. Compaction and scatter-add: work proportional to the data</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./examples/04-newton/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">04. Newton’s method: a loop that stops when it has converged</span></a>
+  </div>
+</li>
       </ul>
   </li>
         <li class="sidebar-item">
@@ -379,7 +397,7 @@ ul.task-list li input[type="checkbox"] {
 <section id="timing" class="level2">
 <h2 class="anchored" data-anchor-id="timing">Timing</h2>
 <ul>
-<li>Timing runs use <strong>Float32</strong>, as is usual on GPUs; the correctness check uses Float64.</li>
+<li>Everything runs in <strong>Float64</strong>, timing included, so the timed code is exactly the code whose gradient was checked. The laptop GPU used here has low Float64 throughput (as most consumer GPUs do), which slows every GPU column; relative comparisons between GPU columns are what matter.</li>
 <li>Compile time (first call) is reported separately from run time. It matters for JAX and Reactant, which compile a whole graph, and for Enzyme, which compiles on first call.</li>
 <li>Run time is the median of 10 calls after 2 warm-up calls. GPU work is synchronised inside the timed region (<code>CUDA.synchronize</code>, <code>jax.block_until_ready</code>).</li>
 <li>Problem size <em>N</em> is swept over several orders of magnitude so scaling is visible, not just one data point.</li>

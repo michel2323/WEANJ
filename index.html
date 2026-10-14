@@ -313,6 +313,24 @@ ul.task-list li input[type="checkbox"] {
  <span class="menu-text">01. Particles: sort, cell lists, and data-dependent neighbour loops</span></a>
   </div>
 </li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./examples/02-gauss-seidel/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">02. Gauss–Seidel: a sequential in-place sweep</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./examples/03-compaction/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">03. Compaction and scatter-add: work proportional to the data</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./examples/04-newton/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">04. Newton’s method: a loop that stops when it has converged</span></a>
+  </div>
+</li>
       </ul>
   </li>
         <li class="sidebar-item">
@@ -332,6 +350,7 @@ ul.task-list li input[type="checkbox"] {
    
   <ul>
   <li><a href="#where-the-gap-shows-up" id="toc-where-the-gap-shows-up" class="nav-link active" data-scroll-target="#where-the-gap-shows-up">Where the gap shows up</a></li>
+  <li><a href="#results-at-a-glance" id="toc-results-at-a-glance" class="nav-link" data-scroll-target="#results-at-a-glance">Results at a glance</a></li>
   <li><a href="#where-jax-wins" id="toc-where-jax-wins" class="nav-link" data-scroll-target="#where-jax-wins">Where JAX wins</a></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/michel2323/WEANJ/blob/main/index.qmd" class="toc-action"><i class="bi bi-github"></i>View source</a></li><li><a href="https://github.com/michel2323/WEANJ/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
@@ -370,7 +389,7 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>Work in progress. The examples are being added one at a time; see the <a href="https://github.com/michel2323/WEANJ/blob/main/AGENTS.md">project plan</a>.</p>
+<p>Draft for review. All four examples are in; examples 03 and 04 do not have a Reactant column yet. Plan and status: <a href="https://github.com/michel2323/WEANJ/blob/main/AGENTS.md">AGENTS.md</a>.</p>
 </div>
 </div>
 <p>“Why do you use Julia instead of JAX?” is a fair question, and “JAX can’t sort” is the wrong answer: <code>jax.lax.sort</code> is differentiable. The real difference is the <strong>execution model</strong>.</p>
@@ -381,21 +400,224 @@ Note
 <dl>
 <dt><strong>Data-dependent output size or sparsity</strong></dt>
 <dd>
-Compaction and filtering (<code>x[mask]</code>, <code>push!</code>), sparse assembly with data-dependent fill-in, contact detection, tree codes (octrees, Barnes–Hut). JAX needs a static upper bound and masks.
+Compaction and filtering (<code>x[mask]</code>, <code>push!</code>), sparse assembly with data-dependent fill-in, contact detection, tree codes (octrees, Barnes–Hut). JAX needs a static upper bound and masks. → <a href="./examples/03-compaction/index.html">03. Compaction</a>
 </dd>
 <dt><strong>Data-dependent control flow</strong></dt>
 <dd>
-Iterative solvers with convergence tests, adaptive time stepping. JAX cannot reverse-differentiate <code>lax.while_loop</code>, so you fix the iteration count or switch to implicit differentiation.
+Iterative solvers with convergence tests, adaptive time stepping. JAX cannot reverse-differentiate <code>lax.while_loop</code>, so you fix the iteration count or switch to implicit differentiation. → <a href="./examples/04-newton/index.html">04. Newton</a>
 </dd>
 <dt><strong>Sequential in-place updates</strong></dt>
 <dd>
-Gauss–Seidel, SOR, Thomas algorithm, sweeps where element <em>i</em> depends on the just-updated <em>i−1</em>. In JAX these become <code>lax.scan</code> with the whole array as carry, and reverse mode stores every carry unless you rematerialise.
+Gauss–Seidel, SOR, Thomas algorithm, sweeps where element <em>i</em> depends on the just-updated <em>i−1</em>. In JAX these become <code>lax.scan</code> loops with one XLA step per element, and for nonlinear updates reverse mode stores every carry unless you rematerialise. → <a href="./examples/02-gauss-seidel/index.html">02. Gauss–Seidel</a>
 </dd>
 <dt><strong>Irregular neighbour access</strong></dt>
 <dd>
-Particle methods with cell lists (sort by cell, loop over a data-dependent number of neighbours), scatter-accumulate with data-dependent indices, histogramming, resampling.
+Particle methods with cell lists (sort by cell, loop over a data-dependent number of neighbours), scatter-accumulate with data-dependent indices, histogramming, resampling. → <a href="./examples/01-particles/index.html">01. Particles</a>
 </dd>
 </dl>
+</section>
+<section id="results-at-a-glance" class="level2">
+<h2 class="anchored" data-anchor-id="results-at-a-glance">Results at a glance</h2>
+<p>Gradient time at the largest problem size each example ran, Float64. Every number comes from the notebooks on the example pages, which also check that the gradients agree. Read each example’s “Where JAX wins” note before quoting a number.</p>
+<div id="61d310d4" class="cell" data-execution_count="1">
+<div class="cell-output cell-output-display cell-output-markdown" data-execution_count="1">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">example</th>
+<th style="text-align: right;">N</th>
+<th style="text-align: left;">implementation</th>
+<th style="text-align: left;">device</th>
+<th style="text-align: left;">gradient</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><a href="examples/01-particles/index.html">01. Particles</a></td>
+<td style="text-align: right;">1,000,000</td>
+<td style="text-align: left;">enzyme</td>
+<td style="text-align: left;">cpu</td>
+<td style="text-align: left;">4.78 s</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><a href="examples/01-particles/index.html">01. Particles</a></td>
+<td style="text-align: right;">1,000,000</td>
+<td style="text-align: left;">enzyme</td>
+<td style="text-align: left;">gpu</td>
+<td style="text-align: left;">2.57 s</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><a href="examples/01-particles/index.html">01. Particles</a></td>
+<td style="text-align: right;">1,000,000</td>
+<td style="text-align: left;">jax</td>
+<td style="text-align: left;">cpu</td>
+<td style="text-align: left;">5.98 s</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><a href="examples/01-particles/index.html">01. Particles</a></td>
+<td style="text-align: right;">100,000</td>
+<td style="text-align: left;">jax</td>
+<td style="text-align: left;">gpu</td>
+<td style="text-align: left;">10.3 ms</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><a href="examples/01-particles/index.html">01. Particles</a></td>
+<td style="text-align: right;">1,000,000</td>
+<td style="text-align: left;">reactant</td>
+<td style="text-align: left;">gpu</td>
+<td style="text-align: left;">196.1 ms</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><a href="examples/02-gauss-seidel/index.html">02. Gauss–Seidel</a></td>
+<td style="text-align: right;">1,048,576</td>
+<td style="text-align: left;">enzyme / lexicographic</td>
+<td style="text-align: left;">cpu</td>
+<td style="text-align: left;">1.32 s</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><a href="examples/02-gauss-seidel/index.html">02. Gauss–Seidel</a></td>
+<td style="text-align: right;">1,048,576</td>
+<td style="text-align: left;">enzyme / red-black</td>
+<td style="text-align: left;">cpu</td>
+<td style="text-align: left;">3.48 s</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><a href="examples/02-gauss-seidel/index.html">02. Gauss–Seidel</a></td>
+<td style="text-align: right;">1,048,576</td>
+<td style="text-align: left;">enzyme / red-black</td>
+<td style="text-align: left;">gpu</td>
+<td style="text-align: left;">21.9 ms</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><a href="examples/02-gauss-seidel/index.html">02. Gauss–Seidel</a></td>
+<td style="text-align: right;">262,144</td>
+<td style="text-align: left;">jax / lexicographic</td>
+<td style="text-align: left;">cpu</td>
+<td style="text-align: left;">19.70 s</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><a href="examples/02-gauss-seidel/index.html">02. Gauss–Seidel</a></td>
+<td style="text-align: right;">4,096</td>
+<td style="text-align: left;">jax / lexicographic</td>
+<td style="text-align: left;">gpu</td>
+<td style="text-align: left;">7.32 s</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><a href="examples/02-gauss-seidel/index.html">02. Gauss–Seidel</a></td>
+<td style="text-align: right;">1,048,576</td>
+<td style="text-align: left;">jax / red-black</td>
+<td style="text-align: left;">cpu</td>
+<td style="text-align: left;">1.81 s</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><a href="examples/02-gauss-seidel/index.html">02. Gauss–Seidel</a></td>
+<td style="text-align: right;">1,048,576</td>
+<td style="text-align: left;">jax / red-black</td>
+<td style="text-align: left;">gpu</td>
+<td style="text-align: left;">20.0 ms</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><a href="examples/02-gauss-seidel/index.html">02. Gauss–Seidel</a></td>
+<td style="text-align: right;">4,096</td>
+<td style="text-align: left;">reactant / lexicographic</td>
+<td style="text-align: left;">gpu</td>
+<td style="text-align: left;">8.34 s</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><a href="examples/02-gauss-seidel/index.html">02. Gauss–Seidel</a></td>
+<td style="text-align: right;">1,048,576</td>
+<td style="text-align: left;">reactant / red-black</td>
+<td style="text-align: left;">gpu</td>
+<td style="text-align: left;">16.8 ms</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><a href="examples/03-compaction/index.html">03. Compaction</a></td>
+<td style="text-align: right;">10,000,000</td>
+<td style="text-align: left;">enzyme</td>
+<td style="text-align: left;">cpu</td>
+<td style="text-align: left;">3.18 s</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><a href="examples/03-compaction/index.html">03. Compaction</a></td>
+<td style="text-align: right;">10,000,000</td>
+<td style="text-align: left;">enzyme</td>
+<td style="text-align: left;">gpu</td>
+<td style="text-align: left;">146.9 ms</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><a href="examples/03-compaction/index.html">03. Compaction</a></td>
+<td style="text-align: right;">10,000,000</td>
+<td style="text-align: left;">jax / compacted</td>
+<td style="text-align: left;">cpu</td>
+<td style="text-align: left;">4.82 s</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><a href="examples/03-compaction/index.html">03. Compaction</a></td>
+<td style="text-align: right;">10,000,000</td>
+<td style="text-align: left;">jax / compacted</td>
+<td style="text-align: left;">gpu</td>
+<td style="text-align: left;">52.6 ms</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><a href="examples/03-compaction/index.html">03. Compaction</a></td>
+<td style="text-align: right;">10,000,000</td>
+<td style="text-align: left;">jax / masked</td>
+<td style="text-align: left;">cpu</td>
+<td style="text-align: left;">11.99 s</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><a href="examples/03-compaction/index.html">03. Compaction</a></td>
+<td style="text-align: right;">1,000,000</td>
+<td style="text-align: left;">jax / masked</td>
+<td style="text-align: left;">gpu</td>
+<td style="text-align: left;">28.6 ms</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><a href="examples/04-newton/index.html">04. Newton</a></td>
+<td style="text-align: right;">1,000,000</td>
+<td style="text-align: left;">enzyme / implicit</td>
+<td style="text-align: left;">cpu</td>
+<td style="text-align: left;">69.1 ms</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><a href="examples/04-newton/index.html">04. Newton</a></td>
+<td style="text-align: right;">1,000,000</td>
+<td style="text-align: left;">enzyme / unrolled</td>
+<td style="text-align: left;">cpu</td>
+<td style="text-align: left;">130.3 ms</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><a href="examples/04-newton/index.html">04. Newton</a></td>
+<td style="text-align: right;">1,000,000</td>
+<td style="text-align: left;">jax / fixed 50 steps</td>
+<td style="text-align: left;">cpu</td>
+<td style="text-align: left;">3.32 s</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><a href="examples/04-newton/index.html">04. Newton</a></td>
+<td style="text-align: right;">1,000,000</td>
+<td style="text-align: left;">jax / fixed 50 steps</td>
+<td style="text-align: left;">gpu</td>
+<td style="text-align: left;">63.4 ms</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><a href="examples/04-newton/index.html">04. Newton</a></td>
+<td style="text-align: right;">1,000,000</td>
+<td style="text-align: left;">jax / implicit</td>
+<td style="text-align: left;">cpu</td>
+<td style="text-align: left;">185.4 ms</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><a href="examples/04-newton/index.html">04. Newton</a></td>
+<td style="text-align: right;">1,000,000</td>
+<td style="text-align: left;">jax / implicit</td>
+<td style="text-align: left;">gpu</td>
+<td style="text-align: left;">3.5 ms</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </section>
 <section id="where-jax-wins" class="level2">
 <h2 class="anchored" data-anchor-id="where-jax-wins">Where JAX wins</h2>

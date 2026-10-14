@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.19">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Each update reads values updated a moment earlier in the same sweep. Natural as a loop, awkward as an array program.">
+
+<title>02. Gauss–Seidel: a sequential in-place sweep – WEANJ</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script><script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-b626d73c4c936ccc3cb08be7d45d1df6.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-c2b28ca354957728c556720f36c2cf34.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-db5980f424f1fc991276b661f5691ae0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-c2b28ca354957728c556720f36c2cf34.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
+
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+<script>
+window.PlotlyConfig = {MathJaxConfig: 'local'};
+if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}
+</script>
+<script type="module">import "https://cdn.plot.ly/plotly-4.1.1.min"</script>
+
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-chtml.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-sidebar docked quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../examples/01-particles/index.html">Examples</a></li><li class="breadcrumb-item"><a href="../../examples/02-gauss-seidel/index.html">02. Gauss–Seidel: a sequential in-place sweep</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../../">WEANJ</a> 
+        <div class="sidebar-tools-main">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Why Enzyme and not JAX?</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../methodology.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Methodology</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../setup.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Run it yourself</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Examples</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../examples/01-particles/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">01. Particles: sort, cell lists, and data-dependent neighbour loops</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../examples/02-gauss-seidel/index.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">02. Gauss–Seidel: a sequential in-place sweep</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../examples/03-compaction/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">03. Compaction and scatter-add: work proportional to the data</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../examples/04-newton/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">04. Newton’s method: a loop that stops when it has converged</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../smoke/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Toolchain check</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#the-problem" id="toc-the-problem" class="nav-link active" data-scroll-target="#the-problem">The problem</a></li>
+  <li><a href="#code" id="toc-code" class="nav-link" data-scroll-target="#code">Code</a></li>
+  <li><a href="#same-gradient" id="toc-same-gradient" class="nav-link" data-scroll-target="#same-gradient">Same gradient</a></li>
+  <li><a href="#timings" id="toc-timings" class="nav-link" data-scroll-target="#timings">Timings</a></li>
+  <li><a href="#what-this-shows" id="toc-what-this-shows" class="nav-link" data-scroll-target="#what-this-shows">What this shows</a></li>
+  <li><a href="#where-jax-wins-what-we-did-not-do" id="toc-where-jax-wins-what-we-did-not-do" class="nav-link" data-scroll-target="#where-jax-wins-what-we-did-not-do">Where JAX wins / what we did not do</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/michel2323/WEANJ/blob/main/examples/02-gauss-seidel/index.qmd" class="toc-action"><i class="bi bi-github"></i>View source</a></li><li><a href="https://github.com/michel2323/WEANJ/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div><div class="quarto-alternate-notebooks"><h2>Notebooks</h2><ul><li><a href="enzyme.embed-preview.html"><i class="bi bi-journal-code"></i>02. Gauss–Seidel — Enzyme.jl</a></li><li><a href="jax.embed-preview.html"><i class="bi bi-journal-code"></i>02. Gauss–Seidel — JAX</a></li><li><a href="reactant.embed-preview.html"><i class="bi bi-journal-code"></i>02. Gauss–Seidel — Reactant.jl</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../examples/01-particles/index.html">Examples</a></li><li class="breadcrumb-item"><a href="../../examples/02-gauss-seidel/index.html">02. Gauss–Seidel: a sequential in-place sweep</a></li></ol></nav>
+<div class="quarto-title">
+<h1 class="title">02. Gauss–Seidel: a sequential in-place sweep</h1>
+</div>
+
+<div>
+  <div class="description">
+    Each update reads values updated a moment earlier in the same sweep. Natural as a loop, awkward as an array program.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="the-problem" class="level2">
+<h2 class="anchored" data-anchor-id="the-problem">The problem</h2>
+<p>Solve <span class="math inline">\(-\Delta u = \theta\)</span> on the unit square (<span class="math inline">\(n \times n\)</span> interior points, <span class="math inline">\(u = 0\)</span> on the boundary) with <span class="math inline">\(K\)</span> Gauss–Seidel sweeps from <span class="math inline">\(u = 0\)</span>, and differentiate <span class="math display">\[\mathcal{L}(\theta) = \lVert u_K(\theta) - u_{\text{obs}} \rVert^2\]</span> with respect to the source <span class="math inline">\(\theta\)</span>. Each update is <span class="math display">\[u_{ij} \leftarrow \tfrac14\left(h^2\theta_{ij} + u_{i-1,j} + u_{i+1,j} + u_{i,j-1} + u_{i,j+1}\right),\]</span> <strong>in place</strong>: <span class="math inline">\(u_{i-1,j}\)</span> and <span class="math inline">\(u_{i,j-1}\)</span> are values already updated earlier in the same sweep. That is what makes Gauss–Seidel converge about twice as fast as Jacobi, and it is what makes it a sequential loop.</p>
+<p>The same pattern appears in SOR, incomplete factorisations, the Thomas algorithm, upwind sweeps and line relaxation.</p>
+<p>Two variants:</p>
+<ul>
+<li><strong>Lexicographic</strong>, the textbook sweep: a triple loop.</li>
+<li><strong>Red-black</strong>, which colours the grid like a chessboard so that each colour can be updated in parallel. It is a <em>different iteration</em>, with a different result, and it is the formulation a GPU or JAX user writes. Gradients are compared within each variant.</li>
+</ul>
+</section>
+<section id="code" class="level2">
+<h2 class="anchored" data-anchor-id="code">Code</h2>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="impl">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true" href="" aria-current="page">Enzyme.jl</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false" href="">JAX</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-3" role="tab" aria-controls="tabset-1-3" aria-selected="false" href="">Reactant.jl</a></li></ul>
+<div class="tab-content" data-group="impl">
+<div id="tabset-1-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-1-1-tab">
+<p>Lexicographic, CPU:</p>
+<div class="quarto-embed-nb-cell">
+<div id="cell-loss-lex" class="cell" data-execution_count="1">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode julia code-with-copy"><code class="sourceCode julia"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Lexicographic Gauss–Seidel, in place: u[i, j] uses the *new* u[i-1, j] and u[i, j-1].</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">gs_loss</span>(θ<span class="op">::</span><span class="dt">AbstractMatrix{T}</span>, uobs, K) <span class="kw">where</span> {T}</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    n <span class="op">=</span> <span class="fu">size</span>(θ, <span class="fl">1</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    h2 <span class="op">=</span> <span class="fu">one</span>(T) <span class="op">/</span> (n <span class="op">+</span> <span class="fl">1</span>)<span class="op">^</span><span class="fl">2</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    u <span class="op">=</span> <span class="fu">zeros</span>(T, n <span class="op">+</span> <span class="fl">2</span>, n <span class="op">+</span> <span class="fl">2</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span>K, j <span class="kw">in</span> <span class="fl">2</span><span class="op">:</span>n<span class="op">+</span><span class="fl">1</span>, i <span class="kw">in</span> <span class="fl">2</span><span class="op">:</span>n<span class="op">+</span><span class="fl">1</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>        u[i, j] <span class="op">=</span> (h2 <span class="op">*</span> θ[i<span class="op">-</span><span class="fl">1</span>, j<span class="op">-</span><span class="fl">1</span>] <span class="op">+</span> u[i<span class="op">-</span><span class="fl">1</span>, j] <span class="op">+</span> u[i<span class="op">+</span><span class="fl">1</span>, j] <span class="op">+</span> u[i, j<span class="op">-</span><span class="fl">1</span>] <span class="op">+</span> u[i, j<span class="op">+</span><span class="fl">1</span>]) <span class="op">/</span> <span class="fl">4</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">end</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    loss <span class="op">=</span> <span class="fu">zero</span>(T)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> j <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span>n, i <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span>n</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>        loss <span class="op">+=</span> (u[i<span class="op">+</span><span class="fl">1</span>, j<span class="op">+</span><span class="fl">1</span>] <span class="op">-</span> uobs[i, j])<span class="op">^</span><span class="fl">2</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">end</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> loss</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="loss-lex" class="cell-output cell-output-display">
+<pre><code>gs_loss (generic function with 1 method)</code></pre>
+</div>
+</div>
+<a class="quarto-notebook-link" id="nblink-1" href="enzyme.embed-preview.html#cell-loss-lex">Source: 02. Gauss–Seidel — Enzyme.jl</a></div>
+<div class="quarto-embed-nb-cell">
+<div id="grad-lex" class="cell" data-execution_count="1">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode julia code-with-copy"><code class="sourceCode julia"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">gs_gradient</span>(θ, uobs, K)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    dθ <span class="op">=</span> <span class="fu">zero</span>(θ)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    Enzyme.<span class="fu">autodiff</span>(Reverse, gs_loss, Active, <span class="fu">Duplicated</span>(θ, dθ), <span class="fu">Const</span>(uobs), <span class="fu">Const</span>(K))</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> dθ</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>g_lex <span class="op">=</span> <span class="fu">gs_gradient</span>(θ<span class="fl">0</span>, uobs0, K_CHECK)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="pp">@printf</span> <span class="st">"loss = %.12f   ‖∇loss‖ = %.6e</span><span class="sc">\n</span><span class="st">"</span> <span class="fu">gs_loss</span>(θ<span class="fl">0</span>, uobs0, K_CHECK) <span class="fu">sqrt</span>(<span class="fu">sum</span>(abs2, g_lex))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>loss = 0.105860373742   ‖∇loss‖ = 6.409859e-04</code></pre>
+</div>
+</div>
+</div>
+<p>Red-black, KernelAbstractions (CPU and GPU):</p>
+<div class="quarto-embed-nb-cell">
+<div id="cell-loss-rb" class="cell" data-execution_count="1">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode julia code-with-copy"><code class="sourceCode julia"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Red-black Gauss–Seidel as a KernelAbstractions kernel (runs on CPU and GPU): points</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="co"># of one colour read only the other colour, so all threads of a colour are independent.</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="pp">@kernel</span> <span class="kw">function</span> <span class="fu">rb_half_sweep!</span>(u, <span class="pp">@Const</span>(θ), colour)</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    I <span class="op">=</span> <span class="pp">@index</span>(Global, Cartesian)</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    i, j <span class="op">=</span> I[<span class="fl">1</span>] <span class="op">+</span> <span class="fl">1</span>, I[<span class="fl">2</span>] <span class="op">+</span> <span class="fl">1</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    h2 <span class="op">=</span> <span class="fu">one</span>(<span class="fu">eltype</span>(u)) <span class="op">/</span> (<span class="fu">size</span>(θ, <span class="fl">1</span>) <span class="op">+</span> <span class="fl">1</span>)<span class="op">^</span><span class="fl">2</span>   <span class="co"># computed here: GPU kernels take no active scalars</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    <span class="pp">@inbounds</span> <span class="cf">if</span> (i <span class="op">+</span> j) <span class="op">%</span> <span class="fl">2</span> <span class="op">==</span> colour</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>        u[i, j] <span class="op">=</span> (h2 <span class="op">*</span> θ[i<span class="op">-</span><span class="fl">1</span>, j<span class="op">-</span><span class="fl">1</span>] <span class="op">+</span> u[i<span class="op">-</span><span class="fl">1</span>, j] <span class="op">+</span> u[i<span class="op">+</span><span class="fl">1</span>, j] <span class="op">+</span> u[i, j<span class="op">-</span><span class="fl">1</span>] <span class="op">+</span> u[i, j<span class="op">+</span><span class="fl">1</span>]) <span class="op">/</span> <span class="fl">4</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">end</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="pp">@kernel</span> <span class="kw">function</span> <span class="fu">sqdiff!</span>(<span class="cn">e</span>, <span class="pp">@Const</span>(u), <span class="pp">@Const</span>(uobs))</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    I <span class="op">=</span> <span class="pp">@index</span>(Global, Cartesian)</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    <span class="pp">@inbounds</span> <span class="cn">e</span>[I] <span class="op">=</span> (u[I[<span class="fl">1</span>]<span class="op">+</span><span class="fl">1</span>, I[<span class="fl">2</span>]<span class="op">+</span><span class="fl">1</span>] <span class="op">-</span> uobs[I])<span class="op">^</span><span class="fl">2</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="st">"Loss terms e (the loss is sum(e)); u is the in-place solution buffer."</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">rb_terms!</span>(<span class="cn">e</span>, u, θ, uobs, K)</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>    backend, n <span class="op">=</span> <span class="fu">get_backend</span>(u), <span class="fu">size</span>(θ, <span class="fl">1</span>)</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>    <span class="fu">fill!</span>(u, <span class="fl">0</span>)</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span>K, colour <span class="kw">in</span> (<span class="fl">0</span>, <span class="fl">1</span>)</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>        <span class="fu">rb_half_sweep!</span>(backend)(u, θ, colour; ndrange<span class="op">=</span>(n, n))</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">end</span></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>    <span class="fu">sqdiff!</span>(backend)(<span class="cn">e</span>, u, uobs; ndrange<span class="op">=</span>(n, n))</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="cn">nothing</span></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">rb_loss</span>(θ, uobs, K)</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>    n <span class="op">=</span> <span class="fu">size</span>(θ, <span class="fl">1</span>)</span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>    <span class="cn">e</span>, u <span class="op">=</span> <span class="fu">similar</span>(θ), <span class="fu">similar</span>(θ, n <span class="op">+</span> <span class="fl">2</span>, n <span class="op">+</span> <span class="fl">2</span>)</span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>    <span class="fu">rb_terms!</span>(<span class="cn">e</span>, u, θ, uobs, K)</span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="fu">sum</span>(<span class="cn">e</span>)</span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="loss-rb" class="cell-output cell-output-display">
+<pre><code>rb_loss (generic function with 1 method)</code></pre>
+</div>
+</div>
+</div>
+<div class="quarto-embed-nb-cell">
+<div id="grad-rb" class="cell" data-execution_count="1">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode julia code-with-copy"><code class="sourceCode julia"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">rb_gradient</span>(θ, uobs, K)</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    n <span class="op">=</span> <span class="fu">size</span>(θ, <span class="fl">1</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="cn">e</span>, de <span class="op">=</span> <span class="fu">similar</span>(θ), <span class="fu">fill!</span>(<span class="fu">similar</span>(θ), <span class="fl">1</span>)</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    u, du <span class="op">=</span> <span class="fu">similar</span>(θ, n <span class="op">+</span> <span class="fl">2</span>, n <span class="op">+</span> <span class="fl">2</span>), <span class="fu">fill!</span>(<span class="fu">similar</span>(θ, n <span class="op">+</span> <span class="fl">2</span>, n <span class="op">+</span> <span class="fl">2</span>), <span class="fl">0</span>)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    dθ <span class="op">=</span> <span class="fu">fill!</span>(<span class="fu">similar</span>(θ), <span class="fl">0</span>)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    Enzyme.<span class="fu">autodiff</span>(Reverse, rb_terms!, Const, <span class="fu">Duplicated</span>(<span class="cn">e</span>, de), <span class="fu">Duplicated</span>(u, du),</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>                    <span class="fu">Duplicated</span>(θ, dθ), <span class="fu">Const</span>(uobs), <span class="fu">Const</span>(K))</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> dθ</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>g_rb <span class="op">=</span> <span class="fu">rb_gradient</span>(θ<span class="fl">0</span>, uobs0, K_CHECK)</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>g_rb_gpu <span class="op">=</span> <span class="fu">Array</span>(<span class="fu">rb_gradient</span>(<span class="fu">CuArray</span>(θ<span class="fl">0</span>), <span class="fu">CuArray</span>(uobs0), K_CHECK))</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="pp">@printf</span> <span class="st">"loss = %.12f   ‖∇loss‖ = %.6e   GPU vs CPU: %.1e</span><span class="sc">\n</span><span class="st">"</span> <span class="fu">rb_loss</span>(θ<span class="fl">0</span>, uobs0, K_CHECK) <span class="fu">sqrt</span>(<span class="fu">sum</span>(abs2, g_rb)) <span class="fu">maximum</span>(abs, g_rb_gpu <span class="op">-</span> g_rb) <span class="op">/</span> <span class="fu">maximum</span>(abs, g_rb)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>loss = 0.105843754705   ‖∇loss‖ = 6.366981e-04   GPU vs CPU: 3.2e-16</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
+<p>Lexicographic:</p>
+<div class="quarto-embed-nb-cell">
+<div id="loss-lex" class="cell" data-execution_count="2">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Lexicographic Gauss–Seidel. Arrays are immutable and loop bodies must be pure, so</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="co"># the sweep is a scan over columns, each a scan over rows carrying the new u[i-1, j].</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Same update order as the Julia loop (i fastest, then j).</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="at">@functools.partial</span>(jax.jit, static_argnums<span class="op">=</span><span class="dv">2</span>)</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> gs_loss(theta, uobs, K):</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    n <span class="op">=</span> theta.shape[<span class="dv">0</span>]</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    h2 <span class="op">=</span> <span class="fl">1.0</span> <span class="op">/</span> (n <span class="op">+</span> <span class="dv">1</span>) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> column(u, j):</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>        left, old, right <span class="op">=</span> u[:, j], u[:, j <span class="op">+</span> <span class="dv">1</span>], u[:, j <span class="op">+</span> <span class="dv">2</span>]</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>        <span class="kw">def</span> point(below, i):  <span class="co"># below = new u[i-1, j]</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>            new <span class="op">=</span> (h2 <span class="op">*</span> theta[i, j] <span class="op">+</span> below <span class="op">+</span> old[i <span class="op">+</span> <span class="dv">2</span>] <span class="op">+</span> left[i <span class="op">+</span> <span class="dv">1</span>] <span class="op">+</span> right[i <span class="op">+</span> <span class="dv">1</span>]) <span class="op">/</span> <span class="dv">4</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> new, new</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>        _, col <span class="op">=</span> jax.lax.scan(point, old[<span class="dv">0</span>], jnp.arange(n))</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> u.at[<span class="dv">1</span>:n <span class="op">+</span> <span class="dv">1</span>, j <span class="op">+</span> <span class="dv">1</span>].<span class="bu">set</span>(col), <span class="va">None</span></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> sweep(u, _):</span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> jax.lax.scan(column, u, jnp.arange(n))[<span class="dv">0</span>], <span class="va">None</span></span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>    u, _ <span class="op">=</span> jax.lax.scan(sweep, jnp.zeros((n <span class="op">+</span> <span class="dv">2</span>, n <span class="op">+</span> <span class="dv">2</span>), theta.dtype), <span class="va">None</span>, length<span class="op">=</span>K)</span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> jnp.<span class="bu">sum</span>((u[<span class="dv">1</span>:<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>:<span class="op">-</span><span class="dv">1</span>] <span class="op">-</span> uobs) <span class="op">**</span> <span class="dv">2</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<a class="quarto-notebook-link" id="nblink-2" href="jax.embed-preview.html#cell-loss-lex">Source: 02. Gauss–Seidel — JAX</a></div>
+<div class="quarto-embed-nb-cell">
+<div id="grad-lex" class="cell" data-execution_count="3">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>gs_grad <span class="op">=</span> jax.jit(jax.grad(gs_loss), static_argnums<span class="op">=</span><span class="dv">2</span>)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>g_lex <span class="op">=</span> gs_grad(theta0, uobs0, K_CHECK)</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"loss = </span><span class="sc">{</span><span class="bu">float</span>(gs_loss(theta0, uobs0, K_CHECK))<span class="sc">:.12f}</span><span class="ss">   ‖∇loss‖ = </span><span class="sc">{</span><span class="bu">float</span>(jnp.linalg.norm(g_lex))<span class="sc">:.6e}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>loss = 0.105860373742   ‖∇loss‖ = 6.409859e-04</code></pre>
+</div>
+</div>
+</div>
+<p>Red-black:</p>
+<div class="quarto-embed-nb-cell">
+<div id="loss-rb" class="cell" data-execution_count="4">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Red-black Gauss–Seidel: the reformulation JAX users actually write. Each colour is</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="co"># one vectorised stencil, selected with a mask.</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="at">@functools.partial</span>(jax.jit, static_argnums<span class="op">=</span><span class="dv">2</span>)</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> rb_loss(theta, uobs, K):</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    n <span class="op">=</span> theta.shape[<span class="dv">0</span>]</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    h2 <span class="op">=</span> <span class="fl">1.0</span> <span class="op">/</span> (n <span class="op">+</span> <span class="dv">1</span>) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    i, j <span class="op">=</span> jnp.meshgrid(jnp.arange(<span class="dv">2</span>, n <span class="op">+</span> <span class="dv">2</span>), jnp.arange(<span class="dv">2</span>, n <span class="op">+</span> <span class="dv">2</span>), indexing<span class="op">=</span><span class="st">"ij"</span>)</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    red <span class="op">=</span> (i <span class="op">+</span> j) <span class="op">%</span> <span class="dv">2</span> <span class="op">==</span> <span class="dv">0</span>  <span class="co"># 1-based indices, as in the Julia kernel</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> half(u, colour):</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>        new <span class="op">=</span> (h2 <span class="op">*</span> theta <span class="op">+</span> u[:<span class="op">-</span><span class="dv">2</span>, <span class="dv">1</span>:<span class="op">-</span><span class="dv">1</span>] <span class="op">+</span> u[<span class="dv">2</span>:, <span class="dv">1</span>:<span class="op">-</span><span class="dv">1</span>] <span class="op">+</span> u[<span class="dv">1</span>:<span class="op">-</span><span class="dv">1</span>, :<span class="op">-</span><span class="dv">2</span>] <span class="op">+</span> u[<span class="dv">1</span>:<span class="op">-</span><span class="dv">1</span>, <span class="dv">2</span>:]) <span class="op">/</span> <span class="dv">4</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> u.at[<span class="dv">1</span>:<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>:<span class="op">-</span><span class="dv">1</span>].<span class="bu">set</span>(jnp.where(colour, new, u[<span class="dv">1</span>:<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>:<span class="op">-</span><span class="dv">1</span>]))</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> sweep(u, _):</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> half(half(u, red), <span class="op">~</span>red), <span class="va">None</span></span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>    u, _ <span class="op">=</span> jax.lax.scan(sweep, jnp.zeros((n <span class="op">+</span> <span class="dv">2</span>, n <span class="op">+</span> <span class="dv">2</span>), theta.dtype), <span class="va">None</span>, length<span class="op">=</span>K)</span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> jnp.<span class="bu">sum</span>((u[<span class="dv">1</span>:<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>:<span class="op">-</span><span class="dv">1</span>] <span class="op">-</span> uobs) <span class="op">**</span> <span class="dv">2</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+<div class="quarto-embed-nb-cell">
+<div id="grad-rb" class="cell" data-execution_count="5">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>rb_grad <span class="op">=</span> jax.jit(jax.grad(rb_loss), static_argnums<span class="op">=</span><span class="dv">2</span>)</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>g_rb <span class="op">=</span> rb_grad(theta0, uobs0, K_CHECK)</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"loss = </span><span class="sc">{</span><span class="bu">float</span>(rb_loss(theta0, uobs0, K_CHECK))<span class="sc">:.12f}</span><span class="ss">   ‖∇loss‖ = </span><span class="sc">{</span><span class="bu">float</span>(jnp.linalg.norm(g_rb))<span class="sc">:.6e}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>loss = 0.105843754705   ‖∇loss‖ = 6.366981e-04</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-1-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-3-tab">
+<p>Lexicographic:</p>
+<div class="quarto-embed-nb-cell">
+<div id="cell-loss-lex" class="cell" data-execution_count="1">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode julia code-with-copy"><code class="sourceCode julia"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># The same triple loop as the Enzyme version. Loops over traced data must be marked</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="co"># @trace, and indexing a traced array at a traced position must be explicitly allowed.</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Each scalar update becomes one step of an XLA while loop.</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">gs_loss</span>(θ, uobs, K)</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>    n <span class="op">=</span> <span class="fu">size</span>(θ, <span class="fl">1</span>)</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    h2 <span class="op">=</span> <span class="fl">1.0</span> <span class="op">/</span> (n <span class="op">+</span> <span class="fl">1</span>)<span class="op">^</span><span class="fl">2</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    u <span class="op">=</span> Reactant.Ops.<span class="fu">fill</span>(<span class="fl">0.0</span>, (n <span class="op">+</span> <span class="fl">2</span>, n <span class="op">+</span> <span class="fl">2</span>))</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>    <span class="pp">@trace</span> <span class="cf">for</span> _ <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span>K</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>        <span class="pp">@trace</span> <span class="cf">for</span> j <span class="kw">in</span> <span class="fl">2</span><span class="op">:</span>n<span class="op">+</span><span class="fl">1</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>            <span class="pp">@trace</span> <span class="cf">for</span> i <span class="kw">in</span> <span class="fl">2</span><span class="op">:</span>n<span class="op">+</span><span class="fl">1</span></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>                Reactant.<span class="pp">@allowscalar</span> u[i, j] <span class="op">=</span></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>                    (h2 <span class="op">*</span> θ[i<span class="op">-</span><span class="fl">1</span>, j<span class="op">-</span><span class="fl">1</span>] <span class="op">+</span> u[i<span class="op">-</span><span class="fl">1</span>, j] <span class="op">+</span> u[i<span class="op">+</span><span class="fl">1</span>, j] <span class="op">+</span> u[i, j<span class="op">-</span><span class="fl">1</span>] <span class="op">+</span> u[i, j<span class="op">+</span><span class="fl">1</span>]) <span class="op">/</span> <span class="fl">4</span></span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>            <span class="cf">end</span></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>        <span class="cf">end</span></span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">end</span></span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="fu">sum</span>((u[<span class="fl">2</span><span class="op">:</span><span class="kw">end</span><span class="op">-</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">:</span><span class="kw">end</span><span class="op">-</span><span class="fl">1</span>] <span class="op">.-</span> uobs) <span class="op">.^</span> <span class="fl">2</span>)</span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="loss-lex" class="cell-output cell-output-display">
+<pre><code>gs_loss (generic function with 1 method)</code></pre>
+</div>
+</div>
+<a class="quarto-notebook-link" id="nblink-3" href="reactant.embed-preview.html#cell-loss-lex">Source: 02. Gauss–Seidel — Reactant.jl</a></div>
+<p>Red-black:</p>
+<div class="quarto-embed-nb-cell">
+<div id="cell-loss-rb" class="cell" data-execution_count="1">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode julia code-with-copy"><code class="sourceCode julia"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Red-black as array operations: one masked stencil per colour. The colour mask is built</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="co"># from traced iota arrays rather than captured as a Julia constant: with a constant mask</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="co"># compilation took minutes at n = 64.</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">rb_loss</span>(θ, uobs, K)</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>    n <span class="op">=</span> <span class="fu">size</span>(θ, <span class="fl">1</span>)</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>    h2 <span class="op">=</span> <span class="fl">1.0</span> <span class="op">/</span> (n <span class="op">+</span> <span class="fl">1</span>)<span class="op">^</span><span class="fl">2</span></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>    i <span class="op">=</span> Reactant.Ops.<span class="fu">iota</span>(<span class="dt">Int64</span>, [n, n]; iota_dimension<span class="op">=</span><span class="fl">1</span>)</span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>    j <span class="op">=</span> Reactant.Ops.<span class="fu">iota</span>(<span class="dt">Int64</span>, [n, n]; iota_dimension<span class="op">=</span><span class="fl">2</span>)</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>    red <span class="op">=</span> <span class="fu">iseven</span>.(i <span class="op">.+</span> j)</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>    u <span class="op">=</span> Reactant.Ops.<span class="fu">fill</span>(<span class="fl">0.0</span>, (n <span class="op">+</span> <span class="fl">2</span>, n <span class="op">+</span> <span class="fl">2</span>))</span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>    <span class="pp">@trace</span> <span class="cf">for</span> _ <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span>K</span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> colour <span class="kw">in</span> (red, .!red)</span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>            <span class="kw">new</span> <span class="op">=</span> (h2 <span class="op">.*</span> θ <span class="op">.+</span> u[<span class="fl">1</span><span class="op">:</span><span class="kw">end</span><span class="op">-</span><span class="fl">2</span>, <span class="fl">2</span><span class="op">:</span><span class="kw">end</span><span class="op">-</span><span class="fl">1</span>] <span class="op">.+</span> u[<span class="fl">3</span><span class="op">:</span><span class="kw">end</span>, <span class="fl">2</span><span class="op">:</span><span class="kw">end</span><span class="op">-</span><span class="fl">1</span>] <span class="op">.+</span></span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>                   u[<span class="fl">2</span><span class="op">:</span><span class="kw">end</span><span class="op">-</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">:</span><span class="kw">end</span><span class="op">-</span><span class="fl">2</span>] <span class="op">.+</span> u[<span class="fl">2</span><span class="op">:</span><span class="kw">end</span><span class="op">-</span><span class="fl">1</span>, <span class="fl">3</span><span class="op">:</span><span class="kw">end</span>]) <span class="op">./</span> <span class="fl">4</span></span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>            u[<span class="fl">2</span><span class="op">:</span><span class="kw">end</span><span class="op">-</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">:</span><span class="kw">end</span><span class="op">-</span><span class="fl">1</span>] <span class="op">=</span> <span class="fu">ifelse</span>.(colour, <span class="kw">new</span>, u[<span class="fl">2</span><span class="op">:</span><span class="kw">end</span><span class="op">-</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">:</span><span class="kw">end</span><span class="op">-</span><span class="fl">1</span>])</span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a>        <span class="cf">end</span></span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">end</span></span>
+<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="fu">sum</span>((u[<span class="fl">2</span><span class="op">:</span><span class="kw">end</span><span class="op">-</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">:</span><span class="kw">end</span><span class="op">-</span><span class="fl">1</span>] <span class="op">.-</span> uobs) <span class="op">.^</span> <span class="fl">2</span>)</span>
+<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="loss-rb" class="cell-output cell-output-display">
+<pre><code>rb_loss (generic function with 1 method)</code></pre>
+</div>
+</div>
+</div>
+<div class="quarto-embed-nb-cell">
+<div id="grad" class="cell" data-execution_count="1">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode julia code-with-copy"><code class="sourceCode julia"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">gradient</span>(f, θ, uobs, K) <span class="op">=</span> Enzyme.<span class="fu">gradient</span>(Reverse, <span class="fu">Const</span>(f), θ, <span class="fu">Const</span>(uobs), <span class="fu">Const</span>(K))[<span class="fl">1</span>]</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>g_lex <span class="op">=</span> <span class="fu">Array</span>((<span class="pp">@compile</span> <span class="fu">gradient</span>(gs_loss, θ<span class="fl">0</span>, uobs0, K_CHECK))(gs_loss, θ<span class="fl">0</span>, uobs0, K_CHECK))</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>g_rb <span class="op">=</span> <span class="fu">Array</span>((<span class="pp">@compile</span> <span class="fu">gradient</span>(rb_loss, θ<span class="fl">0</span>, uobs0, K_CHECK))(rb_loss, θ<span class="fl">0</span>, uobs0, K_CHECK))</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a><span class="pp">@printf</span> <span class="st">"‖∇loss‖: lexicographic %.6e, red-black %.6e</span><span class="sc">\n</span><span class="st">"</span> <span class="fu">sqrt</span>(<span class="fu">sum</span>(abs2, g_lex)) <span class="fu">sqrt</span>(<span class="fu">sum</span>(abs2, g_rb))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>I0000 00:00:1792007279.908700   31484 se_gpu_pjrt_compiler.cc:422] Found GPU target config and a PjRtClient with matching configuration. Performing a JIT compilation.
+I0000 00:00:1792007280.026785   31484 cuda_dnn.cc:478] Loaded cuDNN version 92100
+‖∇loss‖: lexicographic 6.409859e-04, red-black 6.366981e-04</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="same-gradient" class="level2">
+<h2 class="anchored" data-anchor-id="same-gradient">Same gradient</h2>
+<p><span class="math inline">\(n = 32\)</span>, <span class="math inline">\(K = 20\)</span>, Float64. Each gradient is also checked against finite differences.</p>
+<div id="ca342393" class="cell" data-execution_count="2">
+<div class="cell-output cell-output-display">
+<style type="text/css">
+</style>
+
+<div id="T_1304e" class="quarto-float quarto-figure quarto-figure-center anchored" data-quarto-postprocess="true">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="T_1304e-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;1: lexicographic
+</figcaption>
+<div aria-describedby="T_1304e-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table id="T_1304e" class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th id="T_1304e_level0_col0" class="col_heading level0 col0" data-quarto-table-cell-role="th">implementation</th>
+<th id="T_1304e_level0_col1" class="col_heading level0 col1" data-quarto-table-cell-role="th">‖g‖₂</th>
+<th id="T_1304e_level0_col2" class="col_heading level0 col2" data-quarto-table-cell-role="th">max rel. diff vs enzyme-lex</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td id="T_1304e_row0_col0" class="data row0 col0">enzyme-lex</td>
+<td id="T_1304e_row0_col1" class="data row0 col1">6.409859e-04</td>
+<td id="T_1304e_row0_col2" class="data row0 col2">0.0e+00</td>
+</tr>
+<tr class="even">
+<td id="T_1304e_row1_col0" class="data row1 col0">reactant-lex</td>
+<td id="T_1304e_row1_col1" class="data row1 col1">6.409859e-04</td>
+<td id="T_1304e_row1_col2" class="data row1 col2">4.3e-16</td>
+</tr>
+<tr class="odd">
+<td id="T_1304e_row2_col0" class="data row2 col0">jax-lex</td>
+<td id="T_1304e_row2_col1" class="data row2 col1">6.409859e-04</td>
+<td id="T_1304e_row2_col2" class="data row2 col2">2.1e-16</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<style type="text/css">
+</style>
+
+<div id="T_b7cfc" class="quarto-float quarto-figure quarto-figure-center anchored" data-quarto-postprocess="true">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="T_b7cfc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;2: red-black
+</figcaption>
+<div aria-describedby="T_b7cfc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table id="T_b7cfc" class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th id="T_b7cfc_level0_col0" class="col_heading level0 col0" data-quarto-table-cell-role="th">implementation</th>
+<th id="T_b7cfc_level0_col1" class="col_heading level0 col1" data-quarto-table-cell-role="th">‖g‖₂</th>
+<th id="T_b7cfc_level0_col2" class="col_heading level0 col2" data-quarto-table-cell-role="th">max rel. diff vs enzyme-rb</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td id="T_b7cfc_row0_col0" class="data row0 col0">enzyme-rb</td>
+<td id="T_b7cfc_row0_col1" class="data row0 col1">6.366981e-04</td>
+<td id="T_b7cfc_row0_col2" class="data row0 col2">0.0e+00</td>
+</tr>
+<tr class="even">
+<td id="T_b7cfc_row1_col0" class="data row1 col0">reactant-rb</td>
+<td id="T_b7cfc_row1_col1" class="data row1 col1">6.366981e-04</td>
+<td id="T_b7cfc_row1_col2" class="data row1 col2">5.4e-16</td>
+</tr>
+<tr class="odd">
+<td id="T_b7cfc_row2_col0" class="data row2 col0">jax-rb</td>
+<td id="T_b7cfc_row2_col1" class="data row2 col1">6.366981e-04</td>
+<td id="T_b7cfc_row2_col2" class="data row2 col2">4.3e-16</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="timings" class="level2">
+<h2 class="anchored" data-anchor-id="timings">Timings</h2>
+<p><span class="math inline">\(K = 100\)</span> sweeps, Float64, median of 3–10 runs after warm-up. A sweep stops once a single gradient takes more than 5 s.</p>
+<div id="1cb31c01" class="cell" data-execution_count="3">
+<div class="cell-output cell-output-display">
+<div style="height:525px; width:100%;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.min.js"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-4.1.1.min.js" integrity="sha256-O24V1F27f8pb0glCkelh3cVHLNiHAJ5gCaVtq2aNch8=" crossorigin="anonymous"></script>                <div id="3e48847e-508b-47bc-b9a0-223c5df7e762" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("3e48847e-508b-47bc-b9a0-223c5df7e762")) {                    Plotly.newPlot(                        "3e48847e-508b-47bc-b9a0-223c5df7e762",                        [{"hovertemplate":"implementation=enzyme \u002f lexicographic (cpu)\u003cbr\u003egrid points n²=%{x}\u003cbr\u003egradient time [s]=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"enzyme \u002f lexicographic (cpu)","line":{"color":"#636efa","dash":"solid"},"marker":{"symbol":"circle"},"mode":"lines+markers","name":"enzyme \u002f lexicographic (cpu)","orientation":"v","showlegend":true,"x":{"dtype":"i4","bdata":"AAQAAAAQAAAAQAAAAAABAAAABAAAABAA"},"xaxis":"x","y":{"dtype":"f8","bdata":"XPVdarS3TD\u002fMfDK\u002fzfRwP8z+aTifGZM\u002fhdKJl7YetD8T\u002f9htFdnUP1nBdPxFGPU\u002f"},"yaxis":"y","type":"scatter"},{"hovertemplate":"implementation=enzyme \u002f red-black (cpu)\u003cbr\u003egrid points n²=%{x}\u003cbr\u003egradient time [s]=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"enzyme \u002f red-black (cpu)","line":{"color":"#EF553B","dash":"solid"},"marker":{"symbol":"circle"},"mode":"lines+markers","name":"enzyme \u002f red-black (cpu)","orientation":"v","showlegend":true,"x":{"dtype":"i4","bdata":"AAQAAAAQAAAAQAAAAAABAAAABAAAABAA"},"xaxis":"x","y":{"dtype":"f8","bdata":"Y3X\u002f5jImZj9mMYsyFquAPyTR9qjyz6A\u002f\u002fWQQSFdjxT8l2zByZYzgPxIJG6jQ0AtA"},"yaxis":"y","type":"scatter"},{"hovertemplate":"implementation=enzyme \u002f red-black (gpu)\u003cbr\u003egrid points n²=%{x}\u003cbr\u003egradient time [s]=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"enzyme \u002f red-black (gpu)","line":{"color":"#00cc96","dash":"solid"},"marker":{"symbol":"circle"},"mode":"lines+markers","name":"enzyme \u002f red-black (gpu)","orientation":"v","showlegend":true,"x":{"dtype":"i4","bdata":"AAQAAAAQAAAAQAAAAAABAAAABAAAABAA"},"xaxis":"x","y":{"dtype":"f8","bdata":"CIBhYdfihD\u002f0bMjSllmFP3a7m\u002f06nYU\u002fxisYrnGqhT8Ma3nRlvSJP94XmmJDdJY\u002f"},"yaxis":"y","type":"scatter"},{"hovertemplate":"implementation=jax \u002f lexicographic (cpu)\u003cbr\u003egrid points n²=%{x}\u003cbr\u003egradient time [s]=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"jax \u002f lexicographic (cpu)","line":{"color":"#ab63fa","dash":"solid"},"marker":{"symbol":"circle"},"mode":"lines+markers","name":"jax \u002f lexicographic (cpu)","orientation":"v","showlegend":true,"x":{"dtype":"i4","bdata":"AAQAAAAQAAAAQAAAAAABAAAABAA="},"xaxis":"x","y":{"dtype":"f8","bdata":"AABAvEUyhD8AAPrFVuSnPwCAmWNdgs8\u002fALg5h5i+DUAA9hheqbMzQA=="},"yaxis":"y","type":"scatter"},{"hovertemplate":"implementation=jax \u002f red-black (gpu)\u003cbr\u003egrid points n²=%{x}\u003cbr\u003egradient time [s]=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"jax \u002f red-black (gpu)","line":{"color":"#FFA15A","dash":"solid"},"marker":{"symbol":"circle"},"mode":"lines+markers","name":"jax \u002f red-black (gpu)","orientation":"v","showlegend":true,"x":{"dtype":"i4","bdata":"AAQAAAAQAAAAQAAAAAABAAAABAAAABAA"},"xaxis":"x","y":{"dtype":"f8","bdata":"AABAU2bRWz8AAECxgDxdPwAAoDW5MWA\u002fAADATy0laj8AAGC+0Zt9PwAAuJSFcpQ\u002f"},"yaxis":"y","type":"scatter"},{"hovertemplate":"implementation=jax \u002f lexicographic (gpu)\u003cbr\u003egrid points n²=%{x}\u003cbr\u003egradient time [s]=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"jax \u002f lexicographic (gpu)","line":{"color":"#19d3f3","dash":"solid"},"marker":{"symbol":"circle"},"mode":"lines+markers","name":"jax \u002f lexicographic (gpu)","orientation":"v","showlegend":true,"x":{"dtype":"i2","bdata":"AAQAEA=="},"xaxis":"x","y":{"dtype":"f8","bdata":"AMBbZ4MN\u002fj8AvOv6ckodQA=="},"yaxis":"y","type":"scatter"},{"hovertemplate":"implementation=jax \u002f red-black (cpu)\u003cbr\u003egrid points n²=%{x}\u003cbr\u003egradient time [s]=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"jax \u002f red-black (cpu)","line":{"color":"#FF6692","dash":"solid"},"marker":{"symbol":"circle"},"mode":"lines+markers","name":"jax \u002f red-black (cpu)","orientation":"v","showlegend":true,"x":{"dtype":"i4","bdata":"AAQAAAAQAAAAQAAAAAABAAAABAAAABAA"},"xaxis":"x","y":{"dtype":"f8","bdata":"AABgKMaKZj8AAKi6+aaCPwAAAMGOkqU\u002fAABIerZmwj8AAFkkB3vbPwBAYU016Pw\u002f"},"yaxis":"y","type":"scatter"},{"hovertemplate":"implementation=reactant \u002f red-black (gpu)\u003cbr\u003egrid points n²=%{x}\u003cbr\u003egradient time [s]=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"reactant \u002f red-black (gpu)","line":{"color":"#B6E880","dash":"solid"},"marker":{"symbol":"circle"},"mode":"lines+markers","name":"reactant \u002f red-black (gpu)","orientation":"v","showlegend":true,"x":{"dtype":"i4","bdata":"AAQAAAAQAAAAQAAAAAABAAAABAAAABAA"},"xaxis":"x","y":{"dtype":"f8","bdata":"W488vFkWYz8gbNmjNdtkPygKut6yGmU\u002fefCZQJ81aD+TW4GLj\u002ft4PzmMqqi\u002fM5E\u002f"},"yaxis":"y","type":"scatter"},{"hovertemplate":"implementation=reactant \u002f lexicographic (gpu)\u003cbr\u003egrid points n²=%{x}\u003cbr\u003egradient time [s]=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"reactant \u002f lexicographic (gpu)","line":{"color":"#FF97FF","dash":"solid"},"marker":{"symbol":"circle"},"mode":"lines+markers","name":"reactant \u002f lexicographic (gpu)","orientation":"v","showlegend":true,"x":{"dtype":"i2","bdata":"AAQAEA=="},"xaxis":"x","y":{"dtype":"f8","bdata":"3Eicv1D4AEAkrLF3C64gQA=="},"yaxis":"y","type":"scatter"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"margin":{"b":0,"l":0,"r":0,"t":30}}},"xaxis":{"anchor":"y","domain":[0.0,1.0],"title":{"text":"grid points n²"},"type":"log"},"yaxis":{"anchor":"x","domain":[0.0,1.0],"title":{"text":"gradient time [s]"},"type":"log"},"legend":{"title":{"text":"implementation"},"tracegroupgap":0},"title":{"text":"Gradient time vs grid points (K = 100)"}},                        {"responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('3e48847e-508b-47bc-b9a0-223c5df7e762');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+<div id="b760d397" class="cell" data-execution_count="4">
+<div class="cell-output cell-output-display">
+<div style="height:525px; width:100%;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.min.js"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-4.1.1.min.js" integrity="sha256-O24V1F27f8pb0glCkelh3cVHLNiHAJ5gCaVtq2aNch8=" crossorigin="anonymous"></script>                <div id="c05a406a-1d57-464c-bff2-377892a23637" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("c05a406a-1d57-464c-bff2-377892a23637")) {                    Plotly.newPlot(                        "c05a406a-1d57-464c-bff2-377892a23637",                        [{"hovertemplate":"implementation=enzyme \u002f lexicographic (cpu)\u003cbr\u003egrid points n²=%{x}\u003cbr\u003eforward time [s]=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"enzyme \u002f lexicographic (cpu)","line":{"color":"#636efa","dash":"solid"},"marker":{"symbol":"circle"},"mode":"lines+markers","name":"enzyme \u002f lexicographic (cpu)","orientation":"v","showlegend":true,"x":{"dtype":"i4","bdata":"AAQAAAAQAAAAQAAAAAABAAAABAAAABAA"},"xaxis":"x","y":{"dtype":"f8","bdata":"GDUM3fSAPD\u002f+XcBH1HZhP\u002fg+9xMFYoQ\u002f8IOTNzfbpT+rT\u002fUIjrvGPzhhgwQTX+c\u002f"},"yaxis":"y","type":"scatter"},{"hovertemplate":"implementation=enzyme \u002f red-black (cpu)\u003cbr\u003egrid points n²=%{x}\u003cbr\u003eforward time [s]=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"enzyme \u002f red-black (cpu)","line":{"color":"#EF553B","dash":"solid"},"marker":{"symbol":"circle"},"mode":"lines+markers","name":"enzyme \u002f red-black (cpu)","orientation":"v","showlegend":true,"x":{"dtype":"i4","bdata":"AAQAAAAQAAAAQAAAAAABAAAABAAAABAA"},"xaxis":"x","y":{"dtype":"f8","bdata":"MDUPTq6jNj86gVOZDg9UP4z57pP5AHI\u002f1SguC0kNkT8Dq+2dBsmwP4bjOyl63dA\u002f"},"yaxis":"y","type":"scatter"},{"hovertemplate":"implementation=enzyme \u002f red-black (gpu)\u003cbr\u003egrid points n²=%{x}\u003cbr\u003eforward time [s]=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"enzyme \u002f red-black (gpu)","line":{"color":"#00cc96","dash":"solid"},"marker":{"symbol":"circle"},"mode":"lines+markers","name":"enzyme \u002f red-black (gpu)","orientation":"v","showlegend":true,"x":{"dtype":"i4","bdata":"AAQAAAAQAAAAQAAAAAABAAAABAAAABAA"},"xaxis":"x","y":{"dtype":"f8","bdata":"fB1h5nWjUz+25NwZsilTP0cyuKG6nVM\u002fLGt3HPp\u002fWT8FOMy2JB5oPyz79960IIU\u002f"},"yaxis":"y","type":"scatter"},{"hovertemplate":"implementation=jax \u002f lexicographic (cpu)\u003cbr\u003egrid points n²=%{x}\u003cbr\u003eforward time [s]=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"jax \u002f lexicographic (cpu)","line":{"color":"#ab63fa","dash":"solid"},"marker":{"symbol":"circle"},"mode":"lines+markers","name":"jax \u002f lexicographic (cpu)","orientation":"v","showlegend":true,"x":{"dtype":"i4","bdata":"AAQAAAAQAAAAQAAAAAABAAAABAA="},"xaxis":"x","y":{"dtype":"f8","bdata":"AABgcVolbT8AAHDbigyDPwAARAtPNpw\u002fAADjLK2FuT8AwKiZ\u002f5HgPw=="},"yaxis":"y","type":"scatter"},{"hovertemplate":"implementation=jax \u002f red-black (gpu)\u003cbr\u003egrid points n²=%{x}\u003cbr\u003eforward time [s]=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"jax \u002f red-black (gpu)","line":{"color":"#FFA15A","dash":"solid"},"marker":{"symbol":"circle"},"mode":"lines+markers","name":"jax \u002f red-black (gpu)","orientation":"v","showlegend":true,"x":{"dtype":"i4","bdata":"AAQAAAAQAAAAQAAAAAABAAAABAAAABAA"},"xaxis":"x","y":{"dtype":"f8","bdata":"AACAtJweUD8AAMDf\u002f01TPwAAwHGqc1Q\u002fAADAbmyKYD8AAGDEVcNwPwAA8LY1loI\u002f"},"yaxis":"y","type":"scatter"},{"hovertemplate":"implementation=jax \u002f lexicographic (gpu)\u003cbr\u003egrid points n²=%{x}\u003cbr\u003eforward time [s]=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"jax \u002f lexicographic (gpu)","line":{"color":"#19d3f3","dash":"solid"},"marker":{"symbol":"circle"},"mode":"lines+markers","name":"jax \u002f lexicographic (gpu)","orientation":"v","showlegend":true,"x":{"dtype":"i2","bdata":"AAQAEA=="},"xaxis":"x","y":{"dtype":"f8","bdata":"AFDepsMX8T8ASGmOkO0QQA=="},"yaxis":"y","type":"scatter"},{"hovertemplate":"implementation=jax \u002f red-black (cpu)\u003cbr\u003egrid points n²=%{x}\u003cbr\u003eforward time [s]=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"jax \u002f red-black (cpu)","line":{"color":"#FF6692","dash":"solid"},"marker":{"symbol":"circle"},"mode":"lines+markers","name":"jax \u002f red-black (cpu)","orientation":"v","showlegend":true,"x":{"dtype":"i4","bdata":"AAQAAAAQAAAAQAAAAAABAAAABAAAABAA"},"xaxis":"x","y":{"dtype":"f8","bdata":"AACAixESRD8AAMB5XUVaPwAAcMShvoA\u002fAACODUoJqD8AANwz0bvFPwDAYCFhMuc\u002f"},"yaxis":"y","type":"scatter"},{"hovertemplate":"implementation=reactant \u002f red-black (gpu)\u003cbr\u003egrid points n²=%{x}\u003cbr\u003eforward time [s]=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"reactant \u002f red-black (gpu)","line":{"color":"#B6E880","dash":"solid"},"marker":{"symbol":"circle"},"mode":"lines+markers","name":"reactant \u002f red-black (gpu)","orientation":"v","showlegend":true,"x":{"dtype":"i4","bdata":"AAQAAAAQAAAAQAAAAAABAAAABAAAABAA"},"xaxis":"x","y":{"dtype":"f8","bdata":"kIXygqvjWD\u002fQHcw\u002fXVFYP8AYBjYr\u002flY\u002fnjMbxAS+XT9a4x30LfJpPycLs155gXs\u002f"},"yaxis":"y","type":"scatter"},{"hovertemplate":"implementation=reactant \u002f lexicographic (gpu)\u003cbr\u003egrid points n²=%{x}\u003cbr\u003eforward time [s]=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"reactant \u002f lexicographic (gpu)","line":{"color":"#FF97FF","dash":"solid"},"marker":{"symbol":"circle"},"mode":"lines+markers","name":"reactant \u002f lexicographic (gpu)","orientation":"v","showlegend":true,"x":{"dtype":"i2","bdata":"AAQAEA=="},"xaxis":"x","y":{"dtype":"f8","bdata":"Soiy6oXQ8T\u002fCzSucea8RQA=="},"yaxis":"y","type":"scatter"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"margin":{"b":0,"l":0,"r":0,"t":30}}},"xaxis":{"anchor":"y","domain":[0.0,1.0],"title":{"text":"grid points n²"},"type":"log"},"yaxis":{"anchor":"x","domain":[0.0,1.0],"title":{"text":"forward time [s]"},"type":"log"},"legend":{"title":{"text":"implementation"},"tracegroupgap":0},"title":{"text":"Forward time vs grid points (K = 100)"}},                        {"responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('c05a406a-1d57-464c-bff2-377892a23637');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+</section>
+<section id="what-this-shows" class="level2">
+<h2 class="anchored" data-anchor-id="what-this-shows">What this shows</h2>
+<p><strong>The sequential sweep on the CPU.</strong> At <span class="math inline">\(n = 512\)</span> the lexicographic gradient takes 325.7 ms with Enzyme and 19.7 s with JAX, although their forward passes are close (177.6 ms and 517.8 ms). Enzyme’s gradient costs 1.8× its forward pass; JAX’s costs 38×. JAX expresses the sweep as nested <code>lax.scan</code>s, and the transposed scan of a scan does much more work per step than the scalar loop it came from.</p>
+<p><strong>The sequential sweep on the GPU.</strong> At <span class="math inline">\(n = 64\)</span> the lexicographic gradient takes 7.3 s with JAX and 8.3 s with Reactant, against 4.1 ms for Enzyme on one CPU core. Every scalar update becomes a step of an XLA loop, which on the GPU means a device round trip per grid point. Reactant traces the same Julia triple loop as Enzyme, so the language is not the issue: the loop is slow once it goes through XLA.</p>
+<p><strong>Memory does not grow with K, for either tool.</strong> We expected reverse mode through <span class="math inline">\(K\)</span> in-place sweeps to store <span class="math inline">\(K\)</span> copies of <span class="math inline">\(u\)</span>. It doesn’t, because each update is <em>linear</em>: its derivative is the constant <span class="math inline">\(\tfrac14\)</span>, so the backward pass needs no stored values. Both Enzyme’s activity analysis and JAX’s linearisation see this.</p>
+<div id="037c17a8" class="cell" data-execution_count="5">
+<div class="cell-output cell-output-display" data-execution_count="5">
+<style type="text/css">
+</style>
+
+<div id="T_3fb64" class="quarto-float quarto-figure quarto-figure-center anchored" data-quarto-postprocess="true">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="T_3fb64-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;3: Gradient memory [MiB], lexicographic, n = 256 (Enzyme: bytes allocated by the call; JAX: XLA temp buffers)
+</figcaption>
+<div aria-describedby="T_3fb64-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table id="T_3fb64" class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th class="index_name level0" data-quarto-table-cell-role="th">impl</th>
+<th id="T_3fb64_level0_col0" class="col_heading level0 col0" data-quarto-table-cell-role="th">enzyme</th>
+<th id="T_3fb64_level0_col1" class="col_heading level0 col1" data-quarto-table-cell-role="th">jax</th>
+</tr>
+<tr class="even">
+<th class="index_name level0" data-quarto-table-cell-role="th">K</th>
+<th class="blank col0" data-quarto-table-cell-role="th">&nbsp;</th>
+<th class="blank col1" data-quarto-table-cell-role="th">&nbsp;</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th id="T_3fb64_level0_row0" class="row_heading level0 row0" data-quarto-table-cell-role="th">10</th>
+<td id="T_3fb64_row0_col0" class="data row0 col0">1.52</td>
+<td id="T_3fb64_row0_col1" class="data row0 col1">2.04</td>
+</tr>
+<tr class="even">
+<th id="T_3fb64_level0_row1" class="row_heading level0 row1" data-quarto-table-cell-role="th">100</th>
+<td id="T_3fb64_row1_col0" class="data row1 col0">1.52</td>
+<td id="T_3fb64_row1_col1" class="data row1 col1">2.04</td>
+</tr>
+<tr class="odd">
+<th id="T_3fb64_level0_row2" class="row_heading level0 row2" data-quarto-table-cell-role="th">1000</th>
+<td id="T_3fb64_row2_col0" class="data row2 col0">1.52</td>
+<td id="T_3fb64_row2_col1" class="data row2 col1">2.04</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+</div>
+</div>
+<p>A nonlinear sweep, such as nonlinear Gauss–Seidel with a local Newton step, would need stored values in both tools and make memory a real issue. That is not tested here.</p>
+</section>
+<section id="where-jax-wins-what-we-did-not-do" class="level2">
+<h2 class="anchored" data-anchor-id="where-jax-wins-what-we-did-not-do">Where JAX wins / what we did not do</h2>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Red-black on the GPU is where the XLA tools shine.</strong> At <span class="math inline">\(n = 1024\)</span> the red-black gradient takes 16.8 ms with Reactant, 20.0 ms with JAX and 21.9 ms with Enzyme through KernelAbstractions; on small grids Enzyme is several times slower. Enzyme launches two kernels per sweep, forward and reverse, while XLA compiles the whole loop into one program. That launch overhead dominates on small grids.</p>
+</div>
+</div>
+<ul>
+<li>A JAX expert can rewrite the lexicographic sweep without a scalar loop. Along each column the update is a first-order linear recurrence, which <code>jax.lax.associative_scan</code> evaluates in parallel. That is a different algorithm, with different rounding and <span class="math inline">\(O(\log n)\)</span> depth, and you have to know the trick.</li>
+<li>No Enzyme multithreading and no fused multi-sweep GPU kernel.</li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/michel2323\.github\.io\/WEANJ\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/michel2323/WEANJ/blob/main/examples/02-gauss-seidel/index.qmd" class="toc-action"><i class="bi bi-github"></i>View source</a></li><li><a href="https://github.com/michel2323/WEANJ/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>

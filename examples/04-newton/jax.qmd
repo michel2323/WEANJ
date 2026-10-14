@@ -1,0 +1,119 @@
+---
+title: "04. Newton solver — JAX"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+import numpy as np
+import weanj  # sets XLA_PYTHON_CLIENT_PREALLOCATE=false before JAX initialises
+import jax
+import jax.numpy as jnp
+import lineax as lx
+import optimistix as optx
+
+jax.config.update("jax_enable_x64", True)
+EXAMPLE, TOL, MAXITER = "04-newton", 1e-10, 50
+d = weanj.load_inputs(EXAMPLE)
+theta0, uobs0 = jnp.asarray(d["theta"]), jnp.asarray(d["uobs"])
+```
+
+```{python}
+#| label: loss
+def residual(u, theta):
+    n = u.shape[0]
+    ih2 = (n + 1) ** 2
+    up = jnp.pad(u, 1)
+    return ih2 * (2 * u - up[:-2] - up[2:]) + u**3 - theta
+
+def newton_step(u, theta):
+    n = u.shape[0]
+    ih2 = (n + 1) ** 2
+    lower = jnp.full(n, -ih2, u.dtype).at[0].set(0.0)
+    upper = jnp.full(n, -ih2, u.dtype).at[-1].set(0.0)
+    diag = 2 * ih2 + 3 * u**2
+    delta = jax.lax.linalg.tridiagonal_solve(lower, diag, upper, residual(u, theta)[:, None])[:, 0]
+    return u - delta
+
+# The direct translation: Newton until the step is small.
+def loss_while(theta, uobs):
+    def cond(state):
+        u, step, it = state
+        return (step > TOL * jnp.max(jnp.abs(u))) & (it < MAXITER)
+    def body(state):
+        u, _, it = state
+        u_new = newton_step(u, theta)
+        return u_new, jnp.max(jnp.abs(u_new - u)), it + 1
+    u, _, _ = jax.lax.while_loop(cond, body, (jnp.zeros_like(theta), jnp.inf, 0))
+    return jnp.sum((u - uobs) ** 2)
+
+# Workaround 1: a fixed number of Newton steps, enough for the worst case.
+def loss_fixed(theta, uobs, iters=MAXITER):
+    u = jax.lax.fori_loop(0, iters, lambda _, u: newton_step(u, theta), jnp.zeros_like(theta))
+    return jnp.sum((u - uobs) ** 2)
+
+# Workaround 2 (idiomatic): Optimistix root finding, differentiated implicitly.
+def loss_implicit(theta, uobs):
+    # Optimistix stops when the step is small *and* |F| < atol. Rounding in F grows like
+    # (n+1)²·eps, so we root-find on h²·F instead: same root, same Newton steps, same
+    # implicit gradient, but a residual whose rounding error is ~eps·|u|.
+    def scaled_residual(u, theta):
+        return residual(u, theta) / (u.shape[0] + 1) ** 2
+    solver = optx.Newton(rtol=TOL, atol=1e-12, linear_solver=lx.Tridiagonal())
+    sol = optx.root_find(scaled_residual, solver, jnp.zeros_like(theta), theta,
+                         tags=frozenset({lx.tridiagonal_tag}), max_steps=MAXITER)
+    return jnp.sum((sol.value - uobs) ** 2)
+```
+
+```{python}
+#| label: grad
+try:
+    jax.grad(loss_while)(theta0, uobs0)
+except ValueError as err:
+    print("jax.grad(loss_while):", str(err).splitlines()[0])
+
+grad_fixed = jax.jit(jax.grad(loss_fixed))
+grad_implicit = jax.jit(jax.grad(loss_implicit))
+g = grad_implicit(theta0, uobs0)
+g_fixed = grad_fixed(theta0, uobs0)
+print(f"loss = {float(loss_implicit(theta0, uobs0)):.12f}   ‖∇loss‖ = {float(jnp.linalg.norm(g)):.6f}")
+print(f"fixed-iteration vs implicit: max rel. difference {float(jnp.max(jnp.abs(g - g_fixed)) / jnp.max(jnp.abs(g))):.1e}")
+```
+
+```{python}
+#| label: check
+err = weanj.fd_check(lambda t: loss_implicit(jnp.asarray(t), uobs0), np.asarray(theta0), np.asarray(g), n=10, h=1e-5)
+weanj.save_gradient(EXAMPLE, "jax", np.asarray(g))
+print(f"finite differences: max rel. error {err:.1e} on 10 components")
+```
+
+```{python}
+#| label: bench
+import time
+
+ns = [10**3, 10**4, 10**5, 10**6]
+
+def inputs(n, seed=1):
+    rng = np.random.default_rng(seed)
+    return jnp.asarray(50 * rng.standard_normal(n)), jnp.asarray(0.1 * rng.standard_normal(n))
+
+for device in ("cpu", "gpu"):
+    records = []
+    with jax.default_device(jax.devices(device)[0]):
+        fwd_while = jax.jit(loss_while)
+        for variant, grad in (("fixed 50 steps", grad_fixed), ("implicit", grad_implicit)):
+            for n in ns:
+                theta, uobs = inputs(n)
+                t0 = time.perf_counter()
+                jax.block_until_ready(grad(theta, uobs))
+                compile_s = time.perf_counter() - t0
+                samples = 3 if n >= 10**5 else 10
+                records.append(dict(dtype="Float64", variant=variant, N=n,
+                    forward_s=weanj.time_median(lambda: fwd_while(theta, uobs), sync=jax.block_until_ready, samples=samples),
+                    grad_s=weanj.time_median(lambda: grad(theta, uobs), sync=jax.block_until_ready, samples=samples),
+                    compile_s=compile_s, peak_mem_bytes=None))
+    weanj.write_results(EXAMPLE, "jax", device, records)
+    for r in records:
+        print(f"{device} {r['variant']:<15} n={r['N']:<8d} forward {1e3*r['forward_s']:9.3f} ms   "
+              f"gradient {1e3*r['grad_s']:9.3f} ms")
+```

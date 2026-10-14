@@ -1,0 +1,119 @@
+---
+title: "04. Newton solver — Enzyme.jl"
+engine: julia
+julia:
+  exeflags: ["+1.12", "--project=../../julia"]
+---
+
+```{julia}
+#| label: setup
+using WEANJ, Enzyme, Printf
+include("common.jl")   # TOL, MAXITER, shared inputs
+
+d = ensure_inputs()
+θ0, uobs0 = d["theta"], d["uobs"]
+```
+
+```{julia}
+#| label: loss
+"Residual F(u, θ) = A u + u³ − θ with zero Dirichlet ends, written into F."
+function residual!(F, u, θ)
+    n = length(u)
+    ih2 = (n + 1)^2
+    for i in 1:n
+        l = i > 1 ? u[i-1] : zero(eltype(u))
+        r = i < n ? u[i+1] : zero(eltype(u))
+        F[i] = ih2 * (2u[i] - l - r) + u[i]^3 - θ[i]
+    end
+end
+
+"Solve J δ = F in place (δ overwrites F), J = A + 3 diag(u²): the Thomas algorithm."
+function thomas!(F, c, u)
+    n = length(u)
+    ih2 = (n + 1)^2
+    off = -ih2
+    b = 2ih2 + 3u[1]^2
+    c[1] = off / b
+    F[1] = F[1] / b
+    for i in 2:n                                  # forward elimination
+        b = 2ih2 + 3u[i]^2 - off * c[i-1]
+        c[i] = off / b
+        F[i] = (F[i] - off * F[i-1]) / b
+    end
+    for i in n-1:-1:1                             # back substitution
+        F[i] -= c[i] * F[i+1]
+    end
+end
+
+"Newton until the step is small; returns the solution and the iteration count."
+function newton_solve(θ::AbstractVector{T}) where {T}
+    n = length(θ)
+    u, F, c = zeros(T, n), zeros(T, n), zeros(T, n)
+    it, converged = 0, false
+    while !converged && it < MAXITER              # data-dependent trip count
+        residual!(F, u, θ)
+        thomas!(F, c, u)                          # F now holds the Newton step δ
+        u .-= F
+        it += 1
+        converged = maximum(abs, F) <= TOL * maximum(abs, u)
+    end
+    return u, it
+end
+
+newton_loss(θ, uobs) = sum(abs2, first(newton_solve(θ)) .- uobs)
+```
+
+```{julia}
+#| label: grad
+"Reverse mode straight through the while loop, the Newton steps and the Thomas sweeps."
+function newton_gradient(θ, uobs)
+    dθ = zero(θ)
+    Enzyme.autodiff(Reverse, newton_loss, Active, Duplicated(θ, dθ), Const(uobs))
+    return dθ
+end
+
+g = newton_gradient(θ0, uobs0)
+@printf "Newton iterations: %d   loss = %.12f   ‖∇loss‖ = %.6f\n" last(newton_solve(θ0)) newton_loss(θ0, uobs0) sqrt(sum(abs2, g))
+```
+
+```{julia}
+#| label: grad-implicit
+# The alternative a numerical analyst would choose: at the solution, F(u*, θ) = 0, so
+# dL/dθ = λ with Jᵀλ = ∂L/∂u (J is symmetric here). One tridiagonal solve, no tape.
+function newton_gradient_implicit(θ, uobs)
+    u, _ = newton_solve(θ)
+    λ, c = 2 .* (u .- uobs), similar(u)
+    thomas!(λ, c, u)
+    return λ
+end
+
+g_imp = newton_gradient_implicit(θ0, uobs0)
+@printf "unrolled vs implicit: max rel. difference %.1e\n" maximum(abs, g - g_imp) / maximum(abs, g)
+```
+
+```{julia}
+#| label: check
+err = fd_check(t -> newton_loss(t, uobs0), θ0, g; n=10, h=1e-5)
+save_gradient(EXAMPLE, "enzyme", g)
+@printf "finite differences: max rel. error %.1e on 10 components\n" err
+```
+
+```{julia}
+#| label: bench
+ns = [10^3, 10^4, 10^5, 10^6]
+records = []
+for variant in ("unrolled", "implicit"), (k, n) in enumerate(ns)
+    θ, uobs = inputs(n)
+    grad = variant == "unrolled" ? newton_gradient : newton_gradient_implicit
+    compile_s = k == 1 ? @elapsed(grad(θ, uobs)) : nothing
+    samples = n >= 10^5 ? 3 : 10
+    push!(records, (; dtype="Float64", variant, N=n, iterations=last(newton_solve(θ)),
+        forward_s = time_median(() -> newton_loss(θ, uobs); samples),
+        grad_s    = time_median(() -> grad(θ, uobs); samples),
+        compile_s, peak_mem_bytes = @allocated(grad(θ, uobs))))
+end
+write_results(EXAMPLE, "enzyme", "cpu", records)
+for r in records
+    @printf "%-9s n=%-8d iterations %2d   forward %9.3f ms   gradient %9.3f ms   allocated %8.1f MiB\n" r.variant r.N r.iterations 1e3r.forward_s 1e3r.grad_s r.peak_mem_bytes / 2^20
+end
+```

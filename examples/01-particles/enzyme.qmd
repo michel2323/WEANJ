@@ -13,7 +13,7 @@ include("common.jl")   # Params, kernel W, minimum image, inputs
 # Enzyme's reverse-mode GPU kernels store per-iteration values of data-dependent
 # loops in device `malloc` memory. CUDA's default device heap is 8 MB, which overflows
 # above ~30k particles (illegal memory access). Must be set before the first kernel.
-CUDA.limit!(CUDA.LIMIT_MALLOC_HEAP_SIZE, 2^31)
+CUDA.limit!(CUDA.LIMIT_MALLOC_HEAP_SIZE, 2^32)
 
 x0 = ensure_inputs()["x"]    # shared Float64 correctness input, 2×1000
 p0 = Params(size(x0, 2))
@@ -209,11 +209,11 @@ gpu_sync = _ -> CUDA.synchronize()
 records = Dict("cpu" => [], "gpu" => [])
 for (device, prep, sync) in (("cpu", identity, identity), ("gpu", CuArray, gpu_sync))
     for (n, N) in enumerate(Ns)
-        p = Params{Float32}(N)
-        x = prep(positions(Float32, N))
+        p = Params{Float64}(N)
+        x = prep(positions(Float64, N))
         samples = N >= 10^5 ? 3 : 10
         compile_s = n == 1 ? @elapsed(sync(sph_gradient(x, p))) : nothing
-        push!(records[device], (; dtype="Float32", N,
+        push!(records[device], (; dtype="Float64", N,
             forward_s = time_median(() -> sph_loss(x, p); sync, samples),
             grad_s    = time_median(() -> sph_gradient(x, p); sync, samples),
             compile_s, peak_mem_bytes = nothing,

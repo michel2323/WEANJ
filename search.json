@@ -1,0 +1,183 @@
+[
+  {
+    "objectID": "smoke/reactant.html",
+    "href": "smoke/reactant.html",
+    "title": "Smoke: Reactant",
+    "section": "",
+    "text": "using Reactant, Enzyme\nReactant.set_default_backend(\"gpu\")\nloss(x) = sum(sort(x) .^ 2)\ng(x) = Enzyme.gradient(Reverse, loss, x)[1]\nx = Reactant.to_rarray(Float32[3, 1, 4, 2])\nArray((@compile g(x))(x))\n\nWARNING: All log messages before absl::InitializeLog() is called are written to STDERR\nI0000 00:00:1791988126.379046  545827 service.cc:155] XLA service 0xfbc30c0 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:\nI0000 00:00:1791988126.379115  545827 service.cc:171]   StreamExecutor [0]: NVIDIA RTX 5000 Ada Generation Laptop GPU, Compute Capability 8.9 (Driver: 13.0.0[580.178.4]; Runtime: 13.1.0; Toolkit: 13.1.0; DNN: 9.21.0)\nI0000 00:00:1791988126.379777  545827 se_gpu_pjrt_client.cc:1335] Using BFC allocator.\nI0000 00:00:1791988126.379822  545827 gpu_helpers.cc:162] XLA backend allocating 11.68GiB (12538871808 bytes) on device 0 for BFCAllocator.\nI0000 00:00:1791988155.402393  545827 se_gpu_pjrt_compiler.cc:422] Found GPU target config and a PjRtClient with matching configuration. Performing a JIT compilation.\nI0000 00:00:1791988155.444770  545827 cuda_dnn.cc:478] Loaded cuDNN version 92100\n\n\n4-element Vector{Float32}:\n 6.0\n 2.0\n 8.0\n 4.0"
+  },
+  {
+    "objectID": "smoke/index.html",
+    "href": "smoke/index.html",
+    "title": "Toolchain check",
+    "section": "",
+    "text": "Enzyme.jlReactant.jlJAX\n\n\n\n\nusing CUDA, KernelAbstractions, Enzyme\n@kernel function square!(y, @Const(x))\n    i = @index(Global)\n    @inbounds y[i] = x[i]^2\nend\nf!(y, x) = (square!(get_backend(x))(y, x; ndrange=length(x)); nothing)\nx = CuArray(Float32[1, 2, 3, 4]); dx = CUDA.zeros(Float32, 4)\ny = CUDA.zeros(Float32, 4);       dy = CUDA.ones(Float32, 4)\nEnzyme.autodiff(Reverse, f!, Const, Duplicated(y, dy), Duplicated(x, dx))\nArray(dx)\n\n4-element Vector{Float32}:\n 2.0\n 4.0\n 6.0\n 8.0\n\n\nSource: Smoke: Enzyme\n\n\n\n\nusing Reactant, Enzyme\nReactant.set_default_backend(\"gpu\")\nloss(x) = sum(sort(x) .^ 2)\ng(x) = Enzyme.gradient(Reverse, loss, x)[1]\nx = Reactant.to_rarray(Float32[3, 1, 4, 2])\nArray((@compile g(x))(x))\n\n4-element Vector{Float32}:\n 6.0\n 2.0\n 8.0\n 4.0\n\n\nSource: Smoke: Reactant\n\n\n\n\nimport os\nos.environ.setdefault(\"XLA_PYTHON_CLIENT_PREALLOCATE\", \"false\")\nimport jax, jax.numpy as jnp\nprint(jax.devices())\njax.grad(lambda x: jnp.sum(jnp.sort(x) ** 2))(jnp.array([3., 1., 4., 2.]))\n\n[CudaDevice(id=0)]\n\n\nArray([6., 2., 8., 4.], dtype=float32)\n\n\nSource: Smoke: JAX",
+    "crumbs": [
+      "Toolchain check"
+    ]
+  },
+  {
+    "objectID": "setup.html",
+    "href": "setup.html",
+    "title": "Run it yourself",
+    "section": "",
+    "text": "Every page on this site is built from notebooks you can run on your own CUDA GPU.",
+    "crumbs": [
+      "Run it yourself"
+    ]
+  },
+  {
+    "objectID": "setup.html#requirements",
+    "href": "setup.html#requirements",
+    "title": "Run it yourself",
+    "section": "Requirements",
+    "text": "Requirements\n\nLinux with an NVIDIA GPU and a recent driver (tested: driver 580, CUDA 13.0)\njuliaup (the project pins Julia 1.12)\nuv for the Python/JAX environment\nQuarto ≥ 1.10\nmake",
+    "crumbs": [
+      "Run it yourself"
+    ]
+  },
+  {
+    "objectID": "setup.html#install",
+    "href": "setup.html#install",
+    "title": "Run it yourself",
+    "section": "Install",
+    "text": "Install\ngit clone https://github.com/michel2323/WEANJ\ncd WEANJ\nmake setup\nmake setup installs the Julia 1.12 channel, instantiates and precompiles the Julia environment in julia/ (Enzyme, Reactant, CUDA), creates the Python environment in python/ (JAX with CUDA 13), and writes _environment.local so Quarto uses that Python. The first run downloads several GB and takes 10–15 minutes.",
+    "crumbs": [
+      "Run it yourself"
+    ]
+  },
+  {
+    "objectID": "setup.html#check-the-toolchain",
+    "href": "setup.html#check-the-toolchain",
+    "title": "Run it yourself",
+    "section": "Check the toolchain",
+    "text": "Check the toolchain\nquarto render smoke/\nThis runs a tiny gradient on the GPU with each of the three tools. Open _site/smoke/index.html; all three tabs should show output.",
+    "crumbs": [
+      "Run it yourself"
+    ]
+  },
+  {
+    "objectID": "setup.html#run-the-examples",
+    "href": "setup.html#run-the-examples",
+    "title": "Run it yourself",
+    "section": "Run the examples",
+    "text": "Run the examples\nquarto preview                      # browse the site, edit and re-run notebooks live\nquarto render examples/01-particles/enzyme.qmd   # re-run one notebook\nmake run-gpu                        # re-run everything; refreshes _freeze/ and benchmarks/\nRendering a single notebook always executes it. Rendering the whole site uses the frozen outputs in _freeze/, so it does not need a GPU.",
+    "crumbs": [
+      "Run it yourself"
+    ]
+  },
+  {
+    "objectID": "setup.html#troubleshooting",
+    "href": "setup.html#troubleshooting",
+    "title": "Run it yourself",
+    "section": "Troubleshooting",
+    "text": "Troubleshooting\n\nJAX prints CUDA_ERROR_OUT_OF_MEMORY\n\nAnother process is using the GPU. The notebooks disable JAX’s up-front memory reservation, but benchmark numbers are only meaningful on an idle GPU: make gpu-check lists what is running.\n\nJulia version mismatch\n\nThe notebooks start Julia with julia +1.12. Run juliaup add 1.12.",
+    "crumbs": [
+      "Run it yourself"
+    ]
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Why Enzyme and not JAX?",
+    "section": "",
+    "text": "Note\n\n\n\nWork in progress. The examples are being added one at a time; see the project plan.\n“Why do you use Julia instead of JAX?” is a fair question, and “JAX can’t sort” is the wrong answer: jax.lax.sort is differentiable. The real difference is the execution model.\nJAX differentiates pure functions over fixed-shape arrays with a static computation graph. Anything that fits that model runs well, often better than hand-written code, because XLA fuses and vectorises it. Enzyme differentiates the imperative program as written, including in-place mutation, data-dependent loop bounds and growing buffers. When an algorithm’s efficient form is irregular, JAX makes you regularise it with padding, masks, static trip counts or implicit differentiation. Enzyme lets you keep it.\nEach example below implements the same loss three times, with Enzyme.jl, with Reactant.jl, and with JAX, checks that all three give the same gradient, and times them on a CUDA GPU. Reactant is the control: it is Julia compiled through XLA, the same static-graph model as JAX. Where Reactant hits the same wall as JAX, the cause is the execution model, not the language.",
+    "crumbs": [
+      "Why Enzyme and not JAX?"
+    ]
+  },
+  {
+    "objectID": "index.html#where-the-gap-shows-up",
+    "href": "index.html#where-the-gap-shows-up",
+    "title": "Why Enzyme and not JAX?",
+    "section": "Where the gap shows up",
+    "text": "Where the gap shows up\n\nData-dependent output size or sparsity\n\nCompaction and filtering (x[mask], push!), sparse assembly with data-dependent fill-in, contact detection, tree codes (octrees, Barnes–Hut). JAX needs a static upper bound and masks.\n\nData-dependent control flow\n\nIterative solvers with convergence tests, adaptive time stepping. JAX cannot reverse-differentiate lax.while_loop, so you fix the iteration count or switch to implicit differentiation.\n\nSequential in-place updates\n\nGauss–Seidel, SOR, Thomas algorithm, sweeps where element i depends on the just-updated i−1. In JAX these become lax.scan with the whole array as carry, and reverse mode stores every carry unless you rematerialise.\n\nIrregular neighbour access\n\nParticle methods with cell lists (sort by cell, loop over a data-dependent number of neighbours), scatter-accumulate with data-dependent indices, histogramming, resampling.",
+    "crumbs": [
+      "Why Enzyme and not JAX?"
+    ]
+  },
+  {
+    "objectID": "index.html#where-jax-wins",
+    "href": "index.html#where-jax-wins",
+    "title": "Why Enzyme and not JAX?",
+    "section": "Where JAX wins",
+    "text": "Where JAX wins\nDense, batched, regular work: most of machine learning, many PDE stencils, anything whose naive cost already equals its smart cost. There the regularised JAX version is often faster despite padding, because XLA fuses and the hardware wants regular access. And the advantage on this site is Enzyme’s, not Julia’s: Julia AD tools that do not support mutation (Zygote) cannot do this either.",
+    "crumbs": [
+      "Why Enzyme and not JAX?"
+    ]
+  },
+  {
+    "objectID": "methodology.html",
+    "href": "methodology.html",
+    "title": "Methodology",
+    "section": "",
+    "text": "How the comparisons are made, so they can be checked and reproduced.",
+    "crumbs": [
+      "Methodology"
+    ]
+  },
+  {
+    "objectID": "methodology.html#same-inputs",
+    "href": "methodology.html#same-inputs",
+    "title": "Methodology",
+    "section": "Same inputs",
+    "text": "Same inputs\nInputs for each example are generated once in Julia with a fixed seed and written to data/&lt;example&gt;.npz. All three implementations load that file.",
+    "crumbs": [
+      "Methodology"
+    ]
+  },
+  {
+    "objectID": "methodology.html#same-gradient",
+    "href": "methodology.html#same-gradient",
+    "title": "Methodology",
+    "section": "Same gradient",
+    "text": "Same gradient\nEvery implementation computes the gradient of the same loss at the same point in Float64 and saves it to benchmarks/grads/&lt;example&gt;_&lt;impl&gt;.npz. Each example page checks that\n\nevery gradient agrees with central finite differences on a few random components, and\nall three gradients agree with each other (relative tolerance 1e-8).\n\nA failing check fails the build, so a published page always shows matching gradients.",
+    "crumbs": [
+      "Methodology"
+    ]
+  },
+  {
+    "objectID": "methodology.html#timing",
+    "href": "methodology.html#timing",
+    "title": "Methodology",
+    "section": "Timing",
+    "text": "Timing\n\nTiming runs use Float32, as is usual on GPUs; the correctness check uses Float64.\nCompile time (first call) is reported separately from run time. It matters for JAX and Reactant, which compile a whole graph, and for Enzyme, which compiles on first call.\nRun time is the median of 10 calls after 2 warm-up calls. GPU work is synchronised inside the timed region (CUDA.synchronize, jax.block_until_ready).\nProblem size N is swept over several orders of magnitude so scaling is visible, not just one data point.\nPeak device memory is reported where the tool exposes it.\nBenchmarks run on an otherwise idle GPU (make gpu-check refuses to run otherwise).",
+    "crumbs": [
+      "Methodology"
+    ]
+  },
+  {
+    "objectID": "methodology.html#fairness-rules-for-the-jax-column",
+    "href": "methodology.html#fairness-rules-for-the-jax-column",
+    "title": "Methodology",
+    "section": "Fairness rules for the JAX column",
+    "text": "Fairness rules for the JAX column\nThe JAX code is what a competent JAX user would write, not a literal translation:\n\njax.jit everything, donate buffers where it helps, and use jax.checkpoint where a practitioner would.\nUse the ecosystem’s own tools where they exist: jax-md cell and neighbour lists, Optimistix for implicit differentiation, Diffrax for adaptive time stepping.\nWhere JAX needs a static capacity (padding), size it from the data and handle overflow the way jax-md does, and report the padding overhead.\nEvery example page has a “Where JAX wins / what we did not do” note.",
+    "crumbs": [
+      "Methodology"
+    ]
+  },
+  {
+    "objectID": "methodology.html#hardware-and-software",
+    "href": "methodology.html#hardware-and-software",
+    "title": "Methodology",
+    "section": "Hardware and software",
+    "text": "Hardware and software\nResults on the published site were produced on an NVIDIA RTX 5000 Ada Generation Laptop GPU (16 GB), Julia 1.12, Enzyme.jl 0.13, Reactant.jl 0.2, JAX 0.11 (CUDA 13). Exact versions are pinned in julia/Manifest.toml and python/uv.lock.",
+    "crumbs": [
+      "Methodology"
+    ]
+  },
+  {
+    "objectID": "smoke/enzyme.html",
+    "href": "smoke/enzyme.html",
+    "title": "Smoke: Enzyme",
+    "section": "",
+    "text": "using CUDA, KernelAbstractions, Enzyme\n@kernel function square!(y, @Const(x))\n    i = @index(Global)\n    @inbounds y[i] = x[i]^2\nend\nf!(y, x) = (square!(get_backend(x))(y, x; ndrange=length(x)); nothing)\nx = CuArray(Float32[1, 2, 3, 4]); dx = CUDA.zeros(Float32, 4)\ny = CUDA.zeros(Float32, 4);       dy = CUDA.ones(Float32, 4)\nEnzyme.autodiff(Reverse, f!, Const, Duplicated(y, dy), Duplicated(x, dx))\nArray(dx)\n\n\nPrecompiling packages...\n   1085.2 ms  ✓ QuartoNotebookWorkerTablesExt (serial)\n  1 dependency successfully precompiled in 1 seconds\nPrecompiling packages...\n   1078.3 ms  ✓ QuartoNotebookWorkerLaTeXStringsExt (serial)\n  1 dependency successfully precompiled in 1 seconds\n\n\n\n\n4-element Vector{Float32}:\n 2.0\n 4.0\n 6.0\n 8.0"
+  },
+  {
+    "objectID": "smoke/jax.html",
+    "href": "smoke/jax.html",
+    "title": "Smoke: JAX",
+    "section": "",
+    "text": "import os\nos.environ.setdefault(\"XLA_PYTHON_CLIENT_PREALLOCATE\", \"false\")\nimport jax, jax.numpy as jnp\nprint(jax.devices())\njax.grad(lambda x: jnp.sum(jnp.sort(x) ** 2))(jnp.array([3., 1., 4., 2.]))\n\n[CudaDevice(id=0)]\n\n\nArray([6., 2., 8., 4.], dtype=float32)"
+  }
+]

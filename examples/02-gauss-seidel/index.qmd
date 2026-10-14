@@ -1,0 +1,160 @@
+---
+title: "02. Gauss–Seidel: a sequential in-place sweep"
+description: "Each update reads values updated a moment earlier in the same sweep. Natural as a loop, awkward as an array program."
+jupyter: python3
+---
+
+```{python}
+#| echo: false
+import weanj
+import pandas as pd
+EXAMPLE = "02-gauss-seidel"
+res = weanj.load_results(EXAMPLE)
+timed = res[res.grad_s.notna()]
+def t(impl, device, variant, n, col="grad_s"):
+    row = timed[(timed.impl == impl) & (timed.device == device) & (timed.variant == variant) & (timed.n == n)]
+    return float(row[col].iloc[0]) if len(row) else float("nan")
+def ms(v):
+    if v != v:
+        return "not run (over time budget)"
+    return f"{v:.1f} s" if v >= 1 else f"{1e3 * v:.1f} ms" if v >= 1e-3 else f"{1e6 * v:.0f} µs"
+def ratio(a, b):
+    return f"{a / b:.0f}×" if a / b >= 10 else f"{a / b:.1f}×"
+```
+
+## The problem
+
+Solve $-\Delta u = \theta$ on the unit square ($n \times n$ interior points, $u = 0$ on the
+boundary) with $K$ Gauss–Seidel sweeps from $u = 0$, and differentiate
+$$\mathcal{L}(\theta) = \lVert u_K(\theta) - u_{\text{obs}} \rVert^2$$
+with respect to the source $\theta$. Each update is
+$$u_{ij} \leftarrow \tfrac14\left(h^2\theta_{ij} + u_{i-1,j} + u_{i+1,j} + u_{i,j-1} + u_{i,j+1}\right),$$
+**in place**: $u_{i-1,j}$ and $u_{i,j-1}$ are values already updated earlier in the
+same sweep. That is what makes Gauss–Seidel converge about twice as fast as Jacobi,
+and it is what makes it a sequential loop.
+
+The same pattern appears in SOR, incomplete factorisations, the Thomas algorithm,
+upwind sweeps and line relaxation.
+
+Two variants:
+
+- **Lexicographic**, the textbook sweep: a triple loop.
+- **Red-black**, which colours the grid like a chessboard so that each colour can be
+  updated in parallel. It is a *different iteration*, with a different result, and it is
+  the formulation a GPU or JAX user writes. Gradients are compared within each variant.
+
+## Code
+
+::: {.panel-tabset group="impl"}
+## Enzyme.jl
+Lexicographic, CPU:
+{{< embed enzyme.qmd#loss-lex echo=true >}}
+{{< embed enzyme.qmd#grad-lex echo=true >}}
+
+Red-black, KernelAbstractions (CPU and GPU):
+{{< embed enzyme.qmd#loss-rb echo=true >}}
+{{< embed enzyme.qmd#grad-rb echo=true >}}
+
+## JAX
+Lexicographic:
+{{< embed jax.qmd#loss-lex echo=true >}}
+{{< embed jax.qmd#grad-lex echo=true >}}
+
+Red-black:
+{{< embed jax.qmd#loss-rb echo=true >}}
+{{< embed jax.qmd#grad-rb echo=true >}}
+
+## Reactant.jl
+Lexicographic:
+{{< embed reactant.qmd#loss-lex echo=true >}}
+
+Red-black:
+{{< embed reactant.qmd#loss-rb echo=true >}}
+{{< embed reactant.qmd#grad echo=true >}}
+:::
+
+## Same gradient
+
+$n = 32$, $K = 20$, Float64. Each gradient is also checked against finite differences.
+
+```{python}
+#| echo: false
+for variant, impls in (("lexicographic", ("enzyme-lex", "reactant-lex", "jax-lex")),
+                       ("red-black", ("enzyme-rb", "reactant-rb", "jax-rb"))):
+    cmp = weanj.compare_gradients(EXAMPLE, impls=impls)
+    display(cmp.style.hide(axis="index").set_caption(variant)
+            .format({cmp.columns[1]: "{:.6e}", cmp.columns[2]: "{:.1e}"}))
+```
+
+## Timings
+
+$K = 100$ sweeps, Float64, median of 3–10 runs after warm-up. A sweep stops once a
+single gradient takes more than 5 s.
+
+```{python}
+#| echo: false
+weanj.scaling_plot(EXAMPLE, "grad_s", "Gradient time vs grid points (K = 100)",
+                   query="K == 100 and grad_s == grad_s", x_label="grid points n²")
+```
+
+```{python}
+#| echo: false
+weanj.scaling_plot(EXAMPLE, "forward_s", "Forward time vs grid points (K = 100)",
+                   query="K == 100 and forward_s == forward_s", x_label="grid points n²")
+```
+
+## What this shows
+
+**The sequential sweep on the CPU.** At $n = 512$ the lexicographic gradient takes
+`{python} ms(t("enzyme", "cpu", "lexicographic", 512))` with Enzyme and
+`{python} ms(t("jax", "cpu", "lexicographic", 512))` with JAX, although their forward
+passes are close (`{python} ms(t("enzyme", "cpu", "lexicographic", 512, "forward_s"))` and
+`{python} ms(t("jax", "cpu", "lexicographic", 512, "forward_s"))`). Enzyme's gradient costs
+`{python} ratio(t("enzyme", "cpu", "lexicographic", 512), t("enzyme", "cpu", "lexicographic", 512, "forward_s"))`
+its forward pass; JAX's costs
+`{python} ratio(t("jax", "cpu", "lexicographic", 512), t("jax", "cpu", "lexicographic", 512, "forward_s"))`.
+JAX expresses the sweep as nested `lax.scan`s, and the transposed scan of a scan does
+much more work per step than the scalar loop it came from.
+
+**The sequential sweep on the GPU.** At $n = 64$ the lexicographic gradient takes
+`{python} ms(t("jax", "gpu", "lexicographic", 64))` with JAX and
+`{python} ms(t("reactant", "gpu", "lexicographic", 64))` with Reactant, against
+`{python} ms(t("enzyme", "cpu", "lexicographic", 64))` for Enzyme on one CPU core. Every
+scalar update becomes a step of an XLA loop, which on the GPU means a device round trip
+per grid point. Reactant traces the same Julia triple loop as Enzyme, so the language is
+not the issue: the loop is slow once it goes through XLA.
+
+**Memory does not grow with K, for either tool.** We expected reverse mode through
+$K$ in-place sweeps to store $K$ copies of $u$. It doesn't, because each update is
+*linear*: its derivative is the constant $\tfrac14$, so the backward pass needs no
+stored values. Both Enzyme's activity analysis and JAX's linearisation see this.
+
+```{python}
+#| echo: false
+mem = res[(res.variant == "lexicographic") & (res.n == 256) & (res.device == "cpu")]
+mem = mem.assign(MiB=(mem.peak_mem_bytes / 2**20).round(2))
+mem.pivot_table(index="K", columns="impl", values="MiB").style.format("{:.2f}").set_caption(
+    "Gradient memory [MiB], lexicographic, n = 256 (Enzyme: bytes allocated by the call; JAX: XLA temp buffers)")
+```
+
+A nonlinear sweep, such as nonlinear Gauss–Seidel with a local Newton step, would need
+stored values in both tools and make memory a real issue. That is not tested here.
+
+## Where JAX wins / what we did not do
+
+::: {.callout-note}
+**Red-black on the GPU is where the XLA tools shine.** At $n = 1024$ the red-black
+gradient takes `{python} ms(t("reactant", "gpu", "red-black", 1024))` with Reactant,
+`{python} ms(t("jax", "gpu", "red-black", 1024))` with JAX and
+`{python} ms(t("enzyme", "gpu", "red-black", 1024))` with Enzyme through
+KernelAbstractions; on small grids Enzyme is several times slower. Enzyme launches two
+kernels per sweep, forward and reverse, while XLA compiles the whole loop into one
+program. That launch overhead dominates on small
+grids.
+:::
+
+- A JAX expert can rewrite the lexicographic sweep without a scalar loop. Along each
+  column the update is a first-order linear recurrence, which
+  `jax.lax.associative_scan` evaluates in parallel. That is a different algorithm, with
+  different rounding and $O(\log n)$ depth, and you have to know the trick.
+- No Enzyme multithreading and no fused multi-sweep GPU kernel.

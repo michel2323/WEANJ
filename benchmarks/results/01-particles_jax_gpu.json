@@ -4,40 +4,44 @@
   "device": "gpu",
   "records": [
     {
-      "dtype": "Float32",
+      "dtype": "Float64",
       "N": 1000,
-      "forward_s": 0.0011337000760249794,
-      "grad_s": 0.0011564114829525352,
-      "compile_s": 3.2286553799640387,
+      "forward_s": 0.0013821215006828425,
+      "grad_s": 0.0014186710004651104,
+      "compile_s": 3.0785852360004355,
       "peak_mem_bytes": null,
-      "slots": 38995
+      "slots": 38995,
+      "error": null
     },
     {
-      "dtype": "Float32",
+      "dtype": "Float64",
       "N": 10000,
-      "forward_s": 0.0015115374699234962,
-      "grad_s": 0.0016968214767985046,
-      "compile_s": 3.8032795580802485,
+      "forward_s": 0.0016133834997162921,
+      "grad_s": 0.0020817739996346063,
+      "compile_s": 3.6919813149997935,
       "peak_mem_bytes": null,
-      "slots": 391775
+      "slots": 391775,
+      "error": null
     },
     {
-      "dtype": "Float32",
+      "dtype": "Float64",
       "N": 100000,
-      "forward_s": 0.004490425111725926,
-      "grad_s": 0.006960549973882735,
-      "compile_s": 4.092848144937307,
+      "forward_s": 0.006924884999534697,
+      "grad_s": 0.010266966000926914,
+      "compile_s": 3.896097328999531,
       "peak_mem_bytes": null,
-      "slots": 3925355
+      "slots": 3925347,
+      "error": null
     },
     {
-      "dtype": "Float32",
+      "dtype": "Float64",
       "N": 1000000,
-      "forward_s": 0.03854621096979827,
-      "grad_s": 0.06251123803667724,
-      "compile_s": 4.84912940103095,
+      "forward_s": null,
+      "grad_s": null,
+      "compile_s": null,
       "peak_mem_bytes": null,
-      "slots": 39270775
+      "slots": null,
+      "error": "RESOURCE_EXHAUSTED: Out of memory while trying to allocate 4.07GiB with allocator GPU_0_bfc on device 0."
     }
   ]
 }

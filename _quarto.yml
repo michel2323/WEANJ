@@ -23,6 +23,9 @@ website:
       - section: Examples
         contents:
           - examples/01-particles/index.qmd
+          - examples/02-gauss-seidel/index.qmd
+          - examples/03-compaction/index.qmd
+          - examples/04-newton/index.qmd
       - smoke/index.qmd
 
 format:

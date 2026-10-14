@@ -1,0 +1,134 @@
+---
+title: "03. Compaction and scatter-add: work proportional to the data"
+description: "Select the few particles that matter at each step (x[mask], push!) and scatter them into a histogram at data-dependent indices."
+jupyter: python3
+---
+
+```{python}
+#| echo: false
+import weanj
+import pandas as pd
+EXAMPLE = "03-compaction"
+res = weanj.load_results(EXAMPLE)
+def t(impl, device, N, col="grad_s", variant=None):
+    m = (res.impl == impl) & (res.device == device) & (res.N == N)
+    if variant is not None:
+        m &= res.variant == variant
+    row = res[m]
+    return float(row[col].iloc[0]) if len(row) else float("nan")
+def ms(v):
+    return f"{v:.2f} s" if v >= 1 else f"{1e3 * v:.1f} ms" if v >= 1e-3 else f"{1e6 * v:.0f} µs"
+```
+
+## The problem
+
+$N$ particles move with fixed velocities on the periodic interval $[0, 1)$. At each of
+$T = 50$ steps, a narrow window sweeps across the domain. The particles inside it,
+about 1 %, are deposited with linear (cloud-in-cell) weights into a histogram $H$ of
+1024 bins. A taper $w(d) = (1 - |d|/h_w)^2$ fades the contribution to zero at the
+window edges, which keeps the loss differentiable as particles enter and leave. We
+differentiate
+$$\mathcal{L}(x_0) = \lVert H(x_0) - H_{\text{target}} \rVert^2$$
+with respect to the initial positions.
+
+Two irregular patterns are involved:
+
+- **Compaction.** The work worth doing is proportional to the number of *selected*
+  particles, which changes with the data: `x[mask]`, `findall`, `push!` into a buffer.
+- **Scatter-add** at data-dependent indices: `H[j] += w`.
+
+The same patterns appear in event detection, active-set methods, particle-in-cell
+deposits, histogramming, and resampling.
+
+## Code
+
+::: {.panel-tabset group="impl"}
+## Enzyme.jl (CPU)
+{{< embed enzyme.qmd#loss-cpu echo=true >}}
+{{< embed enzyme.qmd#grad-cpu echo=true >}}
+
+## Enzyme.jl (GPU)
+{{< embed enzyme.qmd#loss-gpu echo=true >}}
+{{< embed enzyme.qmd#grad-gpu echo=true >}}
+
+## JAX
+{{< embed jax.qmd#loss echo=true >}}
+{{< embed jax.qmd#grad echo=true >}}
+:::
+
+## Same gradient
+
+```{python}
+#| echo: false
+cmp = weanj.compare_gradients(EXAMPLE, impls=("enzyme", "jax"), rtol=1e-10)
+cmp.style.hide(axis="index").format({cmp.columns[1]: "{:.6f}", cmp.columns[2]: "{:.1e}"})
+```
+
+The gradients differ at the 1e-14 level, not 1e-16, because scatter-adds into the same
+bin are summed in a different order.
+
+## Timings
+
+Float64, $T = 50$ steps, median of 3–10 runs after warm-up.
+
+```{python}
+#| echo: false
+weanj.scaling_plot(EXAMPLE, "grad_s", "Gradient time vs number of particles")
+```
+
+```{python}
+#| echo: false
+weanj.scaling_plot(EXAMPLE, "forward_s", "Forward time vs number of particles")
+```
+
+## What this shows
+
+**CPU, $N = 10^7$.** The gradient takes `{python} ms(t("enzyme", "cpu", 10**7))` with
+Enzyme's compacting loop, `{python} ms(t("jax", "cpu", 10**7, variant="compacted"))` with
+JAX's `nonzero(size=cap)`, and `{python} ms(t("jax", "cpu", 10**7, variant="masked"))`
+with JAX's masked version, which deposits all $N$ particles at every step with zero
+weight. Compaction pays off in JAX too, but there it needs a capacity, a host-side
+check, and a recompilation whenever the capacity changes.
+
+**Memory is where masking really hurts.** Reverse mode through the 50-step `scan`
+keeps each step's residuals. For the masked version that is all $N$ particles per step;
+for the compacted version and for Enzyme, only the selected ones.
+
+```{python}
+#| echo: false
+m = res[res.peak_mem_bytes.notna()].copy()
+m["implementation"] = m.impl + m.variant.map(lambda v: f" / {v}" if isinstance(v, str) else "") + " (" + m.device + ")"
+m["MiB"] = m.peak_mem_bytes / 2**20
+tab = m.pivot_table(index="implementation", columns="N", values="MiB")
+tab.columns = [f"N = {c:.0e}" for c in tab.columns]
+tab.style.format("{:,.1f}", na_rep="").set_caption(
+    "Gradient memory [MiB]. Enzyme: host bytes allocated by the call. JAX: XLA temp buffers.")
+```
+
+On the GPU (16 GB) the masked JAX gradient **runs out of memory at $N = 10^7$**:
+
+```{python}
+#| echo: false
+oom = res[res.get("error").notna()] if "error" in res else res.iloc[0:0]
+for _, r in oom.iterrows():
+    print(f"jax / {r.variant} ({r.device}), N = {r.N:,}: {r.error}")
+```
+
+## Where JAX wins / what we did not do
+
+::: {.callout-note}
+**On the GPU, JAX's compacted version is the fastest.** At $N = 10^7$ the gradient
+takes `{python} ms(t("jax", "gpu", 10**7, variant="compacted"))` with JAX against
+`{python} ms(t("enzyme", "gpu", 10**7))` with Enzyme. On a GPU every implementation
+tests all $N$ particles at every step. Enzyme's kernel lets threads outside the window
+return immediately and scatters the rest with atomic adds, while XLA's `nonzero`
+compaction followed by a dense deposit on ~1 % of the particles is faster here.
+Getting there in JAX required knowing the `nonzero(size=…)` idiom and computing the
+capacity outside `jit`.
+:::
+
+- Neither side sorts particles by position, which would make the selection itself
+  $O(\text{selected})$ instead of $O(N)$ per step.
+- No Enzyme GPU compaction (a stream-compaction kernel before the deposit), which is
+  what a CUDA programmer would write.
+- No Reactant column on this page yet.

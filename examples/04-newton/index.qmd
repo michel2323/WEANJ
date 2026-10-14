@@ -1,0 +1,126 @@
+---
+title: "04. Newton's method: a loop that stops when it has converged"
+description: "Data-dependent control flow: differentiate through a while loop with a convergence test, and through the in-place Thomas sweeps inside it."
+jupyter: python3
+---
+
+```{python}
+#| echo: false
+import weanj
+import pandas as pd
+EXAMPLE = "04-newton"
+res = weanj.load_results(EXAMPLE)
+def t(impl, device, variant, N, col="grad_s"):
+    row = res[(res.impl == impl) & (res.device == device) & (res.variant == variant) & (res.N == N)]
+    return float(row[col].iloc[0]) if len(row) else float("nan")
+def ms(v):
+    return f"{v:.2f} s" if v >= 1 else f"{1e3 * v:.1f} ms" if v >= 1e-3 else f"{1e6 * v:.0f} µs"
+iters = res[(res.impl == "enzyme") & (res.variant == "unrolled")].set_index("N")["iterations"]
+```
+
+## The problem
+
+Solve the nonlinear boundary-value problem
+$$F(u, \theta) = A u + u^3 - \theta = 0, \qquad A = \tfrac{1}{h^2}\operatorname{tridiag}(-1, 2, -1),$$
+by Newton's method **until** the step is small, $\lVert\delta\rVert_\infty \le 10^{-10}\lVert u\rVert_\infty$, and differentiate
+$\mathcal{L}(\theta) = \lVert u^\ast(\theta) - u_{\text{obs}}\rVert^2$ with respect to
+$\theta$. Each Newton step solves a tridiagonal system with the Thomas algorithm, a
+sequential in-place sweep.
+
+Two irregular patterns:
+
+- **Data-dependent control flow.** The number of Newton steps depends on $\theta$
+  (`{python} int(iters.min())`–`{python} int(iters.max())` here).
+- **Sequential in-place update.** The Thomas forward elimination and back substitution.
+
+## Code
+
+::: {.panel-tabset group="impl"}
+## Enzyme.jl
+{{< embed enzyme.qmd#loss echo=true >}}
+{{< embed enzyme.qmd#grad echo=true >}}
+
+Implicit-function alternative:
+{{< embed enzyme.qmd#grad-implicit echo=true >}}
+
+## JAX
+{{< embed jax.qmd#loss echo=true >}}
+{{< embed jax.qmd#grad echo=true >}}
+:::
+
+The direct JAX translation, `jax.grad` of a `lax.while_loop`, is rejected:
+reverse mode needs a static trip count. JAX offers two ways out: run a fixed,
+worst-case number of steps, or switch to implicit differentiation (Optimistix). Enzyme
+differentiates the loop as written, and the implicit adjoint is still available as a
+two-line alternative.
+
+## Same gradient
+
+Enzyme differentiates the Newton iterates and Optimistix applies the implicit-function
+theorem at its own stopping point. Newton converges quadratically, so both land on the
+solution to rounding and the gradients agree closely.
+
+```{python}
+#| echo: false
+cmp = weanj.compare_gradients(EXAMPLE, impls=("enzyme", "jax"), rtol=1e-9)
+cmp.style.hide(axis="index").format({cmp.columns[1]: "{:.6f}", cmp.columns[2]: "{:.1e}"})
+```
+
+## Timings
+
+Float64, median of 3–10 runs after warm-up. "Forward" is the converged Newton solve;
+for JAX that is the `while_loop` version.
+
+```{python}
+#| echo: false
+weanj.scaling_plot(EXAMPLE, "grad_s", "Gradient time vs problem size")
+```
+
+## What this shows
+
+At $n = 10^6$ the gradient takes:
+
+| | gradient |
+|---|---|
+| Enzyme through the loop (CPU) | `{python} ms(t("enzyme", "cpu", "unrolled", 10**6))` |
+| Enzyme, implicit adjoint (CPU) | `{python} ms(t("enzyme", "cpu", "implicit", 10**6))` |
+| JAX, fixed 50 steps (CPU) | `{python} ms(t("jax", "cpu", "fixed 50 steps", 10**6))` |
+| JAX, Optimistix implicit (CPU) | `{python} ms(t("jax", "cpu", "implicit", 10**6))` |
+| JAX, fixed 50 steps (GPU) | `{python} ms(t("jax", "gpu", "fixed 50 steps", 10**6))` |
+| JAX, Optimistix implicit (GPU) | `{python} ms(t("jax", "gpu", "implicit", 10**6))` |
+
+Differentiating through the iterations stores every Newton step for the reverse pass.
+That costs time and memory (at $n = 10^6$, Enzyme allocates
+`{python} f'{t("enzyme", "cpu", "unrolled", 10**6, "peak_mem_bytes") / 2**20:.0f}'` MiB
+unrolled against `{python} f'{t("enzyme", "cpu", "implicit", 10**6, "peak_mem_bytes") / 2**20:.0f}'` MiB
+implicit), and it is the reason JAX refuses dynamic loops. Implicit differentiation is
+usually the better method anyway, and the table shows that.
+
+The fixed-count workaround is expensive: it has to run the worst case
+(here `MAXITER` = 50 steps) although Newton converges in
+`{python} int(iters.min())`–`{python} int(iters.max())`, and reverse mode then stores all 50.
+Choosing a smaller count means guessing how many steps every future input will need.
+The difference is who decides. With Enzyme it is a choice: the loop as written works,
+and the implicit adjoint is a few lines when you want it. With JAX you are forced into
+implicit differentiation or fixed iteration counts, and for a solver without a clean
+fixed-point structure (adaptive time stepping, line searches, event detection) there
+may be no implicit formulation to fall back on.
+
+## Where JAX wins / what we did not do
+
+::: {.callout-note}
+On the GPU, JAX with Optimistix's implicit differentiation is by far the fastest:
+`{python} ms(t("jax", "gpu", "implicit", 10**6))` at $n = 10^6$, using XLA's GPU
+tridiagonal solver. Enzyme's version here is single-threaded CPU code.
+
+Using Optimistix did take care: its default stopping test requires $|F| <$ `atol`,
+which rounding makes unreachable for this problem at large $n$, and its alternative
+step-based test reports "diverged" once the steps stall at rounding level. The fix,
+root-finding on the rescaled residual $h^2 F$, is in the JAX code above.
+:::
+
+- No Enzyme GPU version. The Thomas algorithm is sequential, so a GPU version would
+  need a different tridiagonal solver (cyclic reduction) on both sides.
+- No adaptive time-stepping example (Diffrax), which was in the original plan as a
+  stretch goal.
+- No Reactant column on this page yet.

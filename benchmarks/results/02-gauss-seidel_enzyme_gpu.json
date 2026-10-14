@@ -1,0 +1,73 @@
+{
+    "records": [
+        {
+            "dtype": "Float64",
+            "variant": "red-black",
+            "N": 1024,
+            "n": 32,
+            "K": 100,
+            "forward_s": 0.00119864,
+            "grad_s": 0.010198290499999998,
+            "compile_s": 0.122128268,
+            "peak_mem_bytes": 43072
+        },
+        {
+            "dtype": "Float64",
+            "variant": "red-black",
+            "N": 4096,
+            "n": 64,
+            "K": 100,
+            "forward_s": 0.0011696089999999998,
+            "grad_s": 0.010424784,
+            "compile_s": null,
+            "peak_mem_bytes": 168000
+        },
+        {
+            "dtype": "Float64",
+            "variant": "red-black",
+            "N": 16384,
+            "n": 128,
+            "K": 100,
+            "forward_s": 0.0011972735,
+            "grad_s": 0.010553799499999999,
+            "compile_s": null,
+            "peak_mem_bytes": 663616
+        },
+        {
+            "dtype": "Float64",
+            "variant": "red-black",
+            "N": 65536,
+            "n": 256,
+            "K": 100,
+            "forward_s": 0.0015563909999999999,
+            "grad_s": 0.0105790025,
+            "compile_s": null,
+            "peak_mem_bytes": 2637888
+        },
+        {
+            "dtype": "Float64",
+            "variant": "red-black",
+            "N": 262144,
+            "n": 512,
+            "K": 100,
+            "forward_s": 0.002944061,
+            "grad_s": 0.012673548,
+            "compile_s": null,
+            "peak_mem_bytes": 10518592
+        },
+        {
+            "dtype": "Float64",
+            "variant": "red-black",
+            "N": 1048576,
+            "n": 1024,
+            "K": 100,
+            "forward_s": 0.010316289,
+            "grad_s": 0.021927884,
+            "compile_s": null,
+            "peak_mem_bytes": 42008640
+        }
+    ],
+    "example": "02-gauss-seidel",
+    "device": "gpu",
+    "impl": "enzyme"
+}

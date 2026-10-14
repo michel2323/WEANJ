@@ -110,8 +110,8 @@ save_gradient(EXAMPLE, "reactant", g)
 Ns = [10^3, 10^4, 10^5, 10^6]
 records = []
 for N in Ns
-    p = Params{Float32}(N)
-    xh = positions(Float32, N)
+    p = Params{Float64}(N)
+    xh = positions(Float64, N)
     ncap = max_occupancy(xh, p)
     cap = Val(ncap)
     x = Reactant.to_rarray(xh)
@@ -120,7 +120,7 @@ for N in Ns
         gf = @compile sph_gradient_padded(x, p, cap)
     end
     samples = N >= 10^5 ? 3 : 10
-    push!(records, (; dtype="Float32", N,
+    push!(records, (; dtype="Float64", N,
         forward_s = time_median(() -> lf(x, p, cap); sync=Reactant.synchronize, samples),
         grad_s    = time_median(() -> gf(x, p, cap); sync=Reactant.synchronize, samples),
         compile_s, peak_mem_bytes = nothing,

@@ -3050,6 +3050,7 @@ dependencies = [
     { name = "pandas" },
     { name = "plotly" },
     { name = "pyyaml" },
+    { name = "tabulate" },
 ]
 
 [package.metadata]
@@ -3068,6 +3069,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=3.0.6" },
     { name = "plotly", specifier = ">=7.1.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "tabulate", specifier = ">=0.10.0" },
 ]
 
 [[package]]

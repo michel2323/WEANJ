@@ -85,8 +85,9 @@ WEANJ/
   rtol 1e-8) and agree with central finite differences on a few components.
   This is the credibility step — the table shows *the same gradient* from three
   tools.
-- Timing: Float32 for timing runs, Float64 for the correctness check (explicitly
-  stated). Warm-up excluded; compile time reported separately (matters for
+- Timing: **Float64 everywhere** (user decision 2026-10-14, after Enzyme GPU Float32
+  runtime-activity errors): timing and correctness runs use the same precision.
+  Consumer GPUs have low FP64 throughput; stated on the methodology page. Warm-up excluded; compile time reported separately (matters for
   Reactant and JAX); median of k runs; GPU synchronised (`CUDA.@sync`,
   `block_until_ready()`); N sweep (e.g. 1e3…1e6) → log-log scaling plot.
   Memory: peak device memory (`CUDA.memory_status`/`CUDA.@allocated`; JAX
@@ -244,12 +245,17 @@ Format: `- [ ] task — YYYY-MM-DD note`. Mark `[x]` when done; keep the note to
 - [x] Host page written; rendered and published — 2026-10-14. NOTE: rendering a host page by itself re-executes its embedded notebooks (results shift by run-to-run noise); `quarto render` of the whole project does not.
 
 ### Phase 3 — Examples 2–4
-- [ ] Example 2 (Gauss–Seidel sweep)
-- [ ] Example 3 (compaction / scatter-add)
-- [ ] Example 4 (Newton while-loop); RK45 stretch
+- [x] Example 2 (Gauss–Seidel sweep) — 2026-10-14 all three columns; grads agree ≤5e-16 per variant. Memory does NOT grow with K (linear updates). n=512 lex CPU grad: Enzyme 326 ms vs JAX 19.5 s (46× its forward; transposed nested scan). n=64 lex GPU: JAX 7.3 s, Reactant 8.3 s. Red-black GPU n=1024: Reactant 16.8 / JAX 20.1 / Enzyme 22.1 ms.
+- [x] Example 3 (compaction / scatter-add) — 2026-10-14 Enzyme CPU (`push!` compaction) + GPU (KA atomics); JAX masked + compacted (`nonzero(size=cap)`); grads agree 8e-14 (scatter order). N=1e7: CPU grad Enzyme 3.2 s / JAX compacted 4.7 s / masked 11.9 s; GPU Enzyme 147 ms / JAX compacted 53 ms / masked **OOM (24 GB)**. Enzyme CPU grad allocates 78 MiB vs JAX masked 24 GB temp. No Reactant column.
+- [x] Example 4 (Newton while-loop) — 2026-10-14 converge test changed to step size ‖δ‖∞ ≤ 1e-10‖u‖∞ (absolute ‖F‖<1e-10 unreachable: rounding ~(n+1)²eps). Optimistix needed root-find on h²-scaled residual (default Cauchy test needs |F|<atol; step-based test reports "diverged" at rounding). Enzyme unrolled vs implicit CPU 140/72 ms at 1e6; JAX implicit CPU 195 ms, GPU 3.7 ms; fixed-50 CPU 3.4 s. `jax.grad(while_loop)` error shown. RK45 stretch not done; no Reactant column.
+- [x] Example 1 rerun in Float64 (user decision) — 2026-10-14 Enzyme GPU heap 4 GiB. N=1e6 grad: Enzyme CPU 4.8 s, JAX CPU 6.0 s, Enzyme GPU 2.57 s, Reactant 196 ms, **JAX GPU OOM** (jax-md neighbour list, 4 GiB extra alloc on 16 GB). N=1e5 GPU: JAX 10 ms, Reactant 21 ms, Enzyme 119 ms. Page rewritten accordingly.
+
+- NOTE 2026-10-14: Quarto keeps Julia notebook workers alive after `quarto render`; a Reactant worker keeps ~12 GB of GPU reserved and starves the next notebook (one JAX run was invalidated this way). Run notebooks one at a time and kill Quarto's Julia processes between them (`pkill -f "julia.*--startup-file=no"`), then check `nvidia-smi`. Done in `make run-gpu`.
+- NOTE 2026-10-14: the first full `quarto render` after adding examples 02–04 re-executed their source notebooks (cause not pinned down); a later explicit render of a host page used the frozen outputs (10 s). With `freeze: true` a changed host page is NOT re-rendered by `quarto render`; render it explicitly. Quarto stops the Julia worker after each notebook in a normal render; leaked workers come from killed renders.
+- NOTE 2026-10-14: Reactant compile blow-up — a red-black mask captured as a Julia constant made `@compile` take 127 s at n=32 and >25 min at n=64 (example 02); building it from `Reactant.Ops.iota` inside the traced function compiles in 0.5 s.
 
 ### Phase 4 — write-up
-- [ ] `index.qmd` taxonomy + summary table/plot
+- [x] `index.qmd` taxonomy + summary table — 2026-10-14 categories link to examples; results-at-a-glance table from benchmarks/results (no summary plot)
 - [ ] `methodology.qmd` finalised
 - [ ] `setup.qmd` verified from clean clone
 

@@ -1,0 +1,87 @@
+{
+  "example": "03-compaction",
+  "impl": "jax",
+  "device": "cpu",
+  "records": [
+    {
+      "dtype": "Float64",
+      "variant": "masked",
+      "N": 10000,
+      "compile_s": 0.023819674001060775,
+      "peak_mem_bytes": 25249144,
+      "forward_s": 0.009645791000366444,
+      "grad_s": 0.01932367399967916,
+      "error": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "masked",
+      "N": 100000,
+      "compile_s": 0.15336498000033316,
+      "peak_mem_bytes": 252409080,
+      "forward_s": 0.046737468000173976,
+      "grad_s": 0.17381619549905736,
+      "error": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "masked",
+      "N": 1000000,
+      "compile_s": 1.2298979369988956,
+      "peak_mem_bytes": 2524009080,
+      "forward_s": 0.34654460000092513,
+      "grad_s": 1.2904820919993654,
+      "error": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "masked",
+      "N": 10000000,
+      "compile_s": 11.137520369999038,
+      "peak_mem_bytes": 25240009080,
+      "forward_s": 3.960072450001462,
+      "grad_s": 11.991411271999823,
+      "error": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "compacted",
+      "N": 10000,
+      "compile_s": 0.008209655001337524,
+      "peak_mem_bytes": 651856,
+      "forward_s": 0.005709085000489722,
+      "grad_s": 0.005389675999140309,
+      "error": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "compacted",
+      "N": 100000,
+      "compile_s": 0.07253355600005307,
+      "peak_mem_bytes": 6121936,
+      "forward_s": 0.07273158049974882,
+      "grad_s": 0.07276213000113785,
+      "error": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "compacted",
+      "N": 1000000,
+      "compile_s": 0.5666830080008367,
+      "peak_mem_bytes": 60258320,
+      "forward_s": 0.5308629920000385,
+      "grad_s": 0.5377209690013842,
+      "error": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "compacted",
+      "N": 10000000,
+      "compile_s": 4.686551744998724,
+      "peak_mem_bytes": 594808080,
+      "forward_s": 4.797659375999501,
+      "grad_s": 4.815970887000731,
+      "error": null
+    }
+  ]
+}

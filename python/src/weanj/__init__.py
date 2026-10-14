@@ -149,17 +149,24 @@ def load_results(example: str):
     return pd.DataFrame(rows)
 
 
-def scaling_plot(example: str, metric: str = "grad_s", title: str | None = None):
-    """Log-log plot of `metric` against N, one line per (implementation, variant)."""
+def scaling_plot(example: str, metric: str = "grad_s", title: str | None = None,
+                 query: str | None = None, x: str = "N", x_label: str | None = None):
+    """Log-log plot of `metric` against `x`, one line per (implementation, variant).
+
+    `query` filters the records first (pandas query syntax, e.g. "K == 100").
+    """
     import plotly.express as px
 
     df = load_results(example)
+    if query:
+        df = df.query(query)
     label = df["impl"]
     if "variant" in df:  # e.g. JAX "scan" vs "red-black"
         label = label + df["variant"].map(lambda v: f" / {v}" if isinstance(v, str) else "")
     df = df.assign(implementation=label + " (" + df["device"] + ")")
-    fig = px.line(df.sort_values("N"), x="N", y=metric, color="implementation",
+    fig = px.line(df.sort_values(x), x=x, y=metric, color="implementation",
                   markers=True, log_x=True, log_y=True, title=title,
                   labels={"grad_s": "gradient time [s]", "forward_s": "forward time [s]",
-                          "peak_mem_bytes": "peak device memory [bytes]"})
+                          "peak_mem_bytes": "memory [bytes]",
+                          **({x: x_label} if x_label else {})})
     return fig

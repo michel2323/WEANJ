@@ -1,0 +1,158 @@
+---
+title: "02. Gauss–Seidel — Enzyme.jl"
+engine: julia
+julia:
+  exeflags: ["+1.12", "--project=../../julia"]
+---
+
+```{julia}
+#| label: setup
+using WEANJ, Enzyme, CUDA, KernelAbstractions, Printf
+include("common.jl")   # problem size, shared inputs
+
+d = ensure_inputs()
+θ0, uobs0 = d["theta"], d["uobs"]
+```
+
+```{julia}
+#| label: loss-lex
+# Lexicographic Gauss–Seidel, in place: u[i, j] uses the *new* u[i-1, j] and u[i, j-1].
+function gs_loss(θ::AbstractMatrix{T}, uobs, K) where {T}
+    n = size(θ, 1)
+    h2 = one(T) / (n + 1)^2
+    u = zeros(T, n + 2, n + 2)
+    for _ in 1:K, j in 2:n+1, i in 2:n+1
+        u[i, j] = (h2 * θ[i-1, j-1] + u[i-1, j] + u[i+1, j] + u[i, j-1] + u[i, j+1]) / 4
+    end
+    loss = zero(T)
+    for j in 1:n, i in 1:n
+        loss += (u[i+1, j+1] - uobs[i, j])^2
+    end
+    return loss
+end
+```
+
+```{julia}
+#| label: grad-lex
+function gs_gradient(θ, uobs, K)
+    dθ = zero(θ)
+    Enzyme.autodiff(Reverse, gs_loss, Active, Duplicated(θ, dθ), Const(uobs), Const(K))
+    return dθ
+end
+
+g_lex = gs_gradient(θ0, uobs0, K_CHECK)
+@printf "loss = %.12f   ‖∇loss‖ = %.6e\n" gs_loss(θ0, uobs0, K_CHECK) sqrt(sum(abs2, g_lex))
+```
+
+```{julia}
+#| label: loss-rb
+# Red-black Gauss–Seidel as a KernelAbstractions kernel (runs on CPU and GPU): points
+# of one colour read only the other colour, so all threads of a colour are independent.
+@kernel function rb_half_sweep!(u, @Const(θ), colour)
+    I = @index(Global, Cartesian)
+    i, j = I[1] + 1, I[2] + 1
+    h2 = one(eltype(u)) / (size(θ, 1) + 1)^2   # computed here: GPU kernels take no active scalars
+    @inbounds if (i + j) % 2 == colour
+        u[i, j] = (h2 * θ[i-1, j-1] + u[i-1, j] + u[i+1, j] + u[i, j-1] + u[i, j+1]) / 4
+    end
+end
+
+@kernel function sqdiff!(e, @Const(u), @Const(uobs))
+    I = @index(Global, Cartesian)
+    @inbounds e[I] = (u[I[1]+1, I[2]+1] - uobs[I])^2
+end
+
+"Loss terms e (the loss is sum(e)); u is the in-place solution buffer."
+function rb_terms!(e, u, θ, uobs, K)
+    backend, n = get_backend(u), size(θ, 1)
+    fill!(u, 0)
+    for _ in 1:K, colour in (0, 1)
+        rb_half_sweep!(backend)(u, θ, colour; ndrange=(n, n))
+    end
+    sqdiff!(backend)(e, u, uobs; ndrange=(n, n))
+    return nothing
+end
+
+function rb_loss(θ, uobs, K)
+    n = size(θ, 1)
+    e, u = similar(θ), similar(θ, n + 2, n + 2)
+    rb_terms!(e, u, θ, uobs, K)
+    return sum(e)
+end
+```
+
+```{julia}
+#| label: grad-rb
+function rb_gradient(θ, uobs, K)
+    n = size(θ, 1)
+    e, de = similar(θ), fill!(similar(θ), 1)
+    u, du = similar(θ, n + 2, n + 2), fill!(similar(θ, n + 2, n + 2), 0)
+    dθ = fill!(similar(θ), 0)
+    Enzyme.autodiff(Reverse, rb_terms!, Const, Duplicated(e, de), Duplicated(u, du),
+                    Duplicated(θ, dθ), Const(uobs), Const(K))
+    return dθ
+end
+
+g_rb = rb_gradient(θ0, uobs0, K_CHECK)
+g_rb_gpu = Array(rb_gradient(CuArray(θ0), CuArray(uobs0), K_CHECK))
+@printf "loss = %.12f   ‖∇loss‖ = %.6e   GPU vs CPU: %.1e\n" rb_loss(θ0, uobs0, K_CHECK) sqrt(sum(abs2, g_rb)) maximum(abs, g_rb_gpu - g_rb) / maximum(abs, g_rb)
+```
+
+```{julia}
+#| label: check
+# The loss is quadratic in θ, so a large finite-difference step is exact up to rounding.
+e1 = fd_check(t -> gs_loss(t, uobs0, K_CHECK), θ0, g_lex; n=10, h=1e-2)
+e2 = fd_check(t -> rb_loss(t, uobs0, K_CHECK), θ0, g_rb; n=10, h=1e-2)
+@assert maximum(abs, g_rb_gpu - g_rb) <= 1e-12 * maximum(abs, g_rb)
+save_gradient(EXAMPLE, "enzyme-lex", g_lex)
+save_gradient(EXAMPLE, "enzyme-rb", g_rb)
+@printf "finite differences: lexicographic %.1e, red-black %.1e\n" e1 e2
+```
+
+```{julia}
+#| label: bench
+ns = [32, 64, 128, 256, 512, 1024]
+K = 100
+budget_s = 5.0   # stop a sweep once one gradient takes longer than this
+gpu_sync = _ -> CUDA.synchronize()
+
+function sweep(variant, device, loss, grad; prep=identity, sync=identity, allocated)
+    records = []
+    for (k, n) in enumerate(ns)
+        θ, uobs = prep.(inputs(Float64, n))
+        compile_s = k == 1 ? @elapsed(sync(grad(θ, uobs, K))) : nothing
+        samples = n >= 512 ? 3 : 10
+        r = (; dtype="Float64", variant, N=n^2, n, K,
+             forward_s = time_median(() -> loss(θ, uobs, K); sync, samples),
+             grad_s    = time_median(() -> grad(θ, uobs, K); sync, samples),
+             compile_s, peak_mem_bytes = allocated(() -> grad(θ, uobs, K)))
+        push!(records, r)
+        r.grad_s > budget_s && break
+    end
+    return records
+end
+
+# Memory allocated by one gradient call (host for CPU, device for GPU).
+host_alloc(f) = @allocated f()
+dev_alloc(f) = CUDA.@allocated f()
+
+cpu = vcat(sweep("lexicographic", "cpu", gs_loss, gs_gradient; allocated=host_alloc),
+           sweep("red-black", "cpu", rb_loss, rb_gradient; allocated=host_alloc))
+gpu = sweep("red-black", "gpu", rb_loss, rb_gradient; prep=CuArray, sync=gpu_sync,
+            allocated=dev_alloc)
+
+# Gradient memory against the number of sweeps K, at n = 256.
+θm, uobsm = inputs(Float64, 256)
+for Km in (10, 100, 1000)
+    push!(cpu, (; dtype="Float64", variant="lexicographic", N=256^2, n=256, K=Km,
+                forward_s=nothing, grad_s=nothing, compile_s=nothing,
+                peak_mem_bytes=@allocated(gs_gradient(θm, uobsm, Km))))
+end
+
+write_results(EXAMPLE, "enzyme", "cpu", cpu)
+write_results(EXAMPLE, "enzyme", "gpu", gpu)
+for (dev, rs) in (("cpu", cpu), ("gpu", gpu)), r in rs
+    r.grad_s === nothing && continue
+    @printf "%s %-13s n=%-5d forward %9.3f ms  gradient %9.3f ms  memory %8.2f MiB\n" dev r.variant r.n 1e3r.forward_s 1e3r.grad_s r.peak_mem_bytes / 2^20
+end
+```

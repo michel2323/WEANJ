@@ -4,40 +4,44 @@
   "device": "cpu",
   "records": [
     {
-      "dtype": "Float32",
+      "dtype": "Float64",
       "N": 1000,
-      "forward_s": 0.005633818043861538,
-      "grad_s": 0.006462731515057385,
-      "compile_s": 2.0340080349706113,
+      "forward_s": 0.006455708999965282,
+      "grad_s": 0.0069353225007944275,
+      "compile_s": 1.9497110760003125,
       "peak_mem_bytes": null,
-      "slots": 38995
+      "slots": 38995,
+      "error": null
     },
     {
-      "dtype": "Float32",
+      "dtype": "Float64",
       "N": 10000,
-      "forward_s": 0.05135970300761983,
-      "grad_s": 0.055927239009179175,
-      "compile_s": 1.9095916110090911,
+      "forward_s": 0.06720238550042268,
+      "grad_s": 0.07084339599987288,
+      "compile_s": 1.9153072350000002,
       "peak_mem_bytes": null,
-      "slots": 391775
+      "slots": 391775,
+      "error": null
     },
     {
-      "dtype": "Float32",
+      "dtype": "Float64",
       "N": 100000,
-      "forward_s": 0.4007024229504168,
-      "grad_s": 0.4420228380477056,
-      "compile_s": 2.6291280860314146,
+      "forward_s": 0.5726367690003826,
+      "grad_s": 0.5607762100007676,
+      "compile_s": 2.698186708999856,
       "peak_mem_bytes": null,
-      "slots": 3925355
+      "slots": 3925347,
+      "error": null
     },
     {
-      "dtype": "Float32",
+      "dtype": "Float64",
       "N": 1000000,
-      "forward_s": 4.042577439919114,
-      "grad_s": 4.575510366936214,
-      "compile_s": 11.287566473940387,
+      "forward_s": 5.464442306998535,
+      "grad_s": 5.980907064000348,
+      "compile_s": 13.918283611999868,
       "peak_mem_bytes": null,
-      "slots": 39270775
+      "slots": 39270867,
+      "error": null
     }
   ]
 }

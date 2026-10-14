@@ -1,0 +1,79 @@
+{
+  "example": "04-newton",
+  "impl": "jax",
+  "device": "gpu",
+  "records": [
+    {
+      "dtype": "Float64",
+      "variant": "fixed 50 steps",
+      "N": 1000,
+      "forward_s": 0.0010288430003129179,
+      "grad_s": 0.011970825499702187,
+      "compile_s": 0.21691020899925206,
+      "peak_mem_bytes": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "fixed 50 steps",
+      "N": 10000,
+      "forward_s": 0.0012446890004866873,
+      "grad_s": 0.022552865999386995,
+      "compile_s": 0.40490185799899336,
+      "peak_mem_bytes": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "fixed 50 steps",
+      "N": 100000,
+      "forward_s": 0.0015277160000550793,
+      "grad_s": 0.04416177299935953,
+      "compile_s": 0.27027457199983473,
+      "peak_mem_bytes": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "fixed 50 steps",
+      "N": 1000000,
+      "forward_s": 0.001658327999393805,
+      "grad_s": 0.06337474199972348,
+      "compile_s": 0.3428634020001482,
+      "peak_mem_bytes": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "implicit",
+      "N": 1000,
+      "forward_s": 0.0009532205003779382,
+      "grad_s": 0.0008338134994119173,
+      "compile_s": 1.4198536769999919,
+      "peak_mem_bytes": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "implicit",
+      "N": 10000,
+      "forward_s": 0.0013280330003908603,
+      "grad_s": 0.0016456804996778374,
+      "compile_s": 1.4492063309990044,
+      "peak_mem_bytes": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "implicit",
+      "N": 100000,
+      "forward_s": 0.0015898849997029174,
+      "grad_s": 0.0019510530000843573,
+      "compile_s": 1.6691307289984252,
+      "peak_mem_bytes": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "implicit",
+      "N": 1000000,
+      "forward_s": 0.001785794998795609,
+      "grad_s": 0.003523311999742873,
+      "compile_s": 3.3528407579997292,
+      "peak_mem_bytes": null
+    }
+  ]
+}

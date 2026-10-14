@@ -101,7 +101,7 @@ import time
 
 def positions(n, seed=1):
     rng = np.random.default_rng(seed)
-    return (rng.random((n, 2)) * box_size(n)).astype(np.float32)
+    return (rng.random((n, 2)) * box_size(n)).astype(np.float64)
 
 Ns = [10**3, 10**4, 10**5, 10**6]
 for device in ("cpu", "gpu"):
@@ -109,19 +109,26 @@ for device in ("cpu", "gpu"):
     with jax.default_device(jax.devices(device)[0]):
         for N in Ns:
             x = jnp.asarray(positions(N))
-            t0 = time.perf_counter()
-            P = Particles(x)
-            jax.block_until_ready(P.grad(x))
-            compile_s = time.perf_counter() - t0
-            samples = 3 if N >= 10**5 else 10
-            records.append(dict(
-                dtype="Float32", N=N,
-                forward_s=weanj.time_median(lambda: P.loss(x), sync=jax.block_until_ready, samples=samples),
-                grad_s=weanj.time_median(lambda: P.grad(x), sync=jax.block_until_ready, samples=samples),
-                compile_s=compile_s, peak_mem_bytes=None,
-                slots=int(P.nbrs.idx.shape[1])))
+            r = dict(dtype="Float64", N=N, forward_s=None, grad_s=None, compile_s=None,
+                     peak_mem_bytes=None, slots=None, error=None)
+            try:
+                t0 = time.perf_counter()
+                P = Particles(x)
+                jax.block_until_ready(P.grad(x))
+                r["compile_s"] = time.perf_counter() - t0
+                samples = 3 if N >= 10**5 else 10
+                r["forward_s"] = weanj.time_median(lambda: P.loss(x), sync=jax.block_until_ready, samples=samples)
+                r["grad_s"] = weanj.time_median(lambda: P.grad(x), sync=jax.block_until_ready, samples=samples)
+                r["slots"] = int(P.nbrs.idx.shape[1])
+            except jax.errors.JaxRuntimeError as err:  # out of device memory
+                r["error"] = str(err).split("[")[0].strip()
+            records.append(r)
+            P = None
     weanj.write_results(EXAMPLE, "jax", device, records)
     for r in records:
-        print(f"{device}  N={r['N']:<8d} forward {1e3*r['forward_s']:9.3f} ms   "
-              f"gradient {1e3*r['grad_s']:9.3f} ms   compile {r['compile_s']:5.1f} s")
+        if r["error"]:
+            print(f"{device}  N={r['N']:<8d} {r['error']}")
+        else:
+            print(f"{device}  N={r['N']:<8d} forward {1e3*r['forward_s']:9.3f} ms   "
+                  f"gradient {1e3*r['grad_s']:9.3f} ms   compile {r['compile_s']:5.1f} s")
 ```

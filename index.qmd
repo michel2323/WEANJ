@@ -1,11 +1,12 @@
 ---
 title: "Why Enzyme and not JAX?"
 subtitle: "Differentiating programs whose efficient form is irregular"
+jupyter: python3
 ---
 
 ::: {.callout-note}
-Work in progress. The examples are being added one at a time; see the
-[project plan](https://github.com/michel2323/WEANJ/blob/main/AGENTS.md).
+Draft for review. All four examples are in; examples 03 and 04 do not have a Reactant
+column yet. Plan and status: [AGENTS.md](https://github.com/michel2323/WEANJ/blob/main/AGENTS.md).
 :::
 
 "Why do you use Julia instead of JAX?" is a fair question, and "JAX can't sort" is the
@@ -31,21 +32,65 @@ the same wall as JAX, the cause is the execution model, not the language.
 **Data-dependent output size or sparsity**
 : Compaction and filtering (`x[mask]`, `push!`), sparse assembly with data-dependent
   fill-in, contact detection, tree codes (octrees, Barnes–Hut). JAX needs a static upper
-  bound and masks.
+  bound and masks. → [03. Compaction](examples/03-compaction/index.qmd)
 
 **Data-dependent control flow**
 : Iterative solvers with convergence tests, adaptive time stepping. JAX cannot
   reverse-differentiate `lax.while_loop`, so you fix the iteration count or switch to
-  implicit differentiation.
+  implicit differentiation. → [04. Newton](examples/04-newton/index.qmd)
 
 **Sequential in-place updates**
 : Gauss–Seidel, SOR, Thomas algorithm, sweeps where element *i* depends on the
-  just-updated *i−1*. In JAX these become `lax.scan` with the whole array as carry, and
-  reverse mode stores every carry unless you rematerialise.
+  just-updated *i−1*. In JAX these become `lax.scan` loops with one XLA step per
+  element, and for nonlinear updates reverse mode stores every carry unless you
+  rematerialise. → [02. Gauss–Seidel](examples/02-gauss-seidel/index.qmd)
 
 **Irregular neighbour access**
 : Particle methods with cell lists (sort by cell, loop over a data-dependent number of
   neighbours), scatter-accumulate with data-dependent indices, histogramming, resampling.
+  → [01. Particles](examples/01-particles/index.qmd)
+
+## Results at a glance
+
+Gradient time at the largest problem size each example ran, Float64. Every number
+comes from the notebooks on the example pages, which also check that the gradients
+agree. Read each example's "Where JAX wins" note before quoting a number.
+
+```{python}
+#| echo: false
+import pandas as pd
+import weanj
+
+pages = {
+    "01-particles": "[01. Particles](examples/01-particles/index.html)",
+    "02-gauss-seidel": "[02. Gauss–Seidel](examples/02-gauss-seidel/index.html)",
+    "03-compaction": "[03. Compaction](examples/03-compaction/index.html)",
+    "04-newton": "[04. Newton](examples/04-newton/index.html)",
+}
+
+def fmt(v):
+    if v != v:
+        return "—"
+    return f"{v:.2f} s" if v >= 1 else f"{1e3 * v:.1f} ms"
+
+rows = []
+for ex, link in pages.items():
+    r = weanj.load_results(ex)
+    if r.empty:
+        continue
+    if "K" in r:
+        r = r[r.K == 100]
+    r = r[r.grad_s.notna()]
+    if "variant" not in r:
+        r = r.assign(variant=None)
+    for (impl, variant, device), g in r.groupby(["impl", r.variant.fillna(""), "device"]):
+        big = g[g.N == g.N.max()]
+        rows.append({"example": link, "N": f"{int(g.N.max()):,}",
+                     "implementation": impl + (f" / {variant}" if variant else ""),
+                     "device": device, "gradient": fmt(float(big.grad_s.iloc[0]))})
+from IPython.display import Markdown
+Markdown(pd.DataFrame(rows).to_markdown(index=False))
+```
 
 ## Where JAX wins
 

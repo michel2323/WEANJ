@@ -1,0 +1,39 @@
+{
+    "records": [
+        {
+            "dtype": "Float64",
+            "N": 10000,
+            "forward_s": 0.000404057,
+            "grad_s": 0.0034068695,
+            "compile_s": 0.087693818,
+            "peak_mem_bytes": null
+        },
+        {
+            "dtype": "Float64",
+            "N": 100000,
+            "forward_s": 0.0007879035,
+            "grad_s": 0.003832157,
+            "compile_s": null,
+            "peak_mem_bytes": null
+        },
+        {
+            "dtype": "Float64",
+            "N": 1000000,
+            "forward_s": 0.004978178,
+            "grad_s": 0.016430071,
+            "compile_s": null,
+            "peak_mem_bytes": null
+        },
+        {
+            "dtype": "Float64",
+            "N": 10000000,
+            "forward_s": 0.041607728,
+            "grad_s": 0.146902199,
+            "compile_s": null,
+            "peak_mem_bytes": null
+        }
+    ],
+    "example": "03-compaction",
+    "device": "gpu",
+    "impl": "enzyme"
+}

@@ -1,0 +1,79 @@
+{
+  "example": "04-newton",
+  "impl": "jax",
+  "device": "cpu",
+  "records": [
+    {
+      "dtype": "Float64",
+      "variant": "fixed 50 steps",
+      "N": 1000,
+      "forward_s": 0.0003180445000907639,
+      "grad_s": 0.0030008859994268278,
+      "compile_s": 0.5078456060000462,
+      "peak_mem_bytes": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "fixed 50 steps",
+      "N": 10000,
+      "forward_s": 0.001308427499679965,
+      "grad_s": 0.026892190500802826,
+      "compile_s": 0.21010649299932993,
+      "peak_mem_bytes": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "fixed 50 steps",
+      "N": 100000,
+      "forward_s": 0.011455015001047286,
+      "grad_s": 0.3502875360009057,
+      "compile_s": 0.5477274879995093,
+      "peak_mem_bytes": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "fixed 50 steps",
+      "N": 1000000,
+      "forward_s": 0.10172620599951188,
+      "grad_s": 3.324538782999298,
+      "compile_s": 3.50400683099906,
+      "peak_mem_bytes": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "implicit",
+      "N": 1000,
+      "forward_s": 0.00037113449980097357,
+      "grad_s": 0.00026093450014741393,
+      "compile_s": 1.0017200969996338,
+      "peak_mem_bytes": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "implicit",
+      "N": 10000,
+      "forward_s": 0.0014753369987374754,
+      "grad_s": 0.002084900000227208,
+      "compile_s": 0.9040199669998401,
+      "peak_mem_bytes": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "implicit",
+      "N": 100000,
+      "forward_s": 0.011234003000936355,
+      "grad_s": 0.019288708001113264,
+      "compile_s": 1.1576016609997168,
+      "peak_mem_bytes": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "implicit",
+      "N": 1000000,
+      "forward_s": 0.10406506300023466,
+      "grad_s": 0.18537582399949315,
+      "compile_s": 3.1697742810010823,
+      "peak_mem_bytes": null
+    }
+  ]
+}

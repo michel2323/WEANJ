@@ -12,9 +12,11 @@ EXAMPLE = "01-particles"
 res = weanj.load_results(EXAMPLE)
 def t(impl, device, N, col="grad_s"):
     row = res[(res.impl == impl) & (res.device == device) & (res.N == N)]
-    return float(row[col].iloc[0])
+    return float(row[col].iloc[0]) if len(row) and pd.notna(row[col].iloc[0]) else float("nan")
 def ms(v):
-    return f"{1e3 * v:.1f} ms" if v >= 1e-3 else f"{1e6 * v:.0f} µs"
+    if v != v:
+        return "out of memory"
+    return f"{v:.2f} s" if v >= 1 else f"{1e3 * v:.1f} ms" if v >= 1e-3 else f"{1e6 * v:.0f} µs"
 ```
 
 ## The problem
@@ -82,7 +84,7 @@ cmp.style.hide(axis="index").format({cmp.columns[1]: "{:.6f}", cmp.columns[2]: "
 
 ## Timings
 
-Float32, median of 3–10 runs after warm-up, GPU synchronised. Each gradient includes
+Float64, median of 3–10 runs after warm-up, GPU synchronised. Each gradient includes
 rebuilding the cell or neighbour list. NVIDIA RTX 5000 Ada Laptop GPU and Intel
 i9-13980HX, with Enzyme on the CPU single-threaded and JAX on the CPU using XLA's
 default threading.
@@ -103,7 +105,7 @@ weanj.scaling_plot(EXAMPLE, "forward_s", "Loss (forward only) time vs number of 
 #| label: table
 #| echo: false
 N = res.N.max()
-big = res[res.N == N].copy()
+big = res[(res.N == N) & res.grad_s.notna()].copy()
 big["implementation"] = big.impl + " (" + big.device + ")"
 big["forward"] = big.forward_s.map(ms)
 big["gradient"] = big.grad_s.map(ms)
@@ -119,6 +121,13 @@ big["compile [s]"] = [
       "pair slots evaluated", "compile [s]"]]
  .sort_values("implementation").style.hide(axis="index")
  .set_caption(f"N = {N:,} particles"))
+```
+
+```{python}
+#| echo: false
+if "error" in res:
+    for _, r in res[res.error.notna()].iterrows():
+        print(f"{r.impl} ({r.device}), N = {r.N:,}: {r.error}")
 ```
 
 "Pair slots evaluated" counts the candidate pairs each method computes a distance for.
@@ -137,26 +146,36 @@ Enzyme takes `{python} ms(t("enzyme", "cpu", 10**6))` for the gradient, against
 `{python} ms(t("enzyme", "cpu", 10**6, "forward_s"))` against
 `{python} ms(t("jax", "cpu", 10**6, "forward_s"))`.
 
+**The padded version runs out of memory on the GPU.** In Float64, jax-md's neighbour
+list for $10^6$ particles does not fit on the 16 GB GPU: building it needs a further
+4 GiB intermediate on top of a pair list of
+`{python} f'{t("jax", "cpu", 10**6, "slots") / 1e6:.0f}'` million slots. Enzyme's cell list
+needs no capacity at all.
+
 **Reactant behaves like JAX.** Reactant is Julia, but compiled through XLA, and it
-needs the same regularisation: padded cells, masks, a branch-free kernel. Its gradient
-takes `{python} ms(t("reactant", "gpu", 10**6))` against JAX's
-`{python} ms(t("jax", "gpu", 10**6))`, even though its padded cell list evaluates
-`{python} f'{t("reactant", "gpu", 10**6, "slots") / t("jax", "gpu", 10**6, "slots"):.0f}'`× more pair slots than jax-md's pre-filtered pair list. The constraint comes from the
-static-graph execution model, not from the language.
+needs the same regularisation: padded cells, masks, a branch-free kernel. At
+$N = 10^5$ its gradient takes `{python} ms(t("reactant", "gpu", 10**5))` against JAX's
+`{python} ms(t("jax", "gpu", 10**5))`. Its padded cell list is leaner than jax-md's pair
+list (no stored pair indices), so it still fits at $N = 10^6$
+(`{python} ms(t("reactant", "gpu", 10**6))`). The constraint comes from the static-graph
+execution model, not from the language.
 
 ## Where JAX wins / where Enzyme hurts
 
 ::: {.callout-warning}
-## On the GPU, today, JAX's padded version is much faster than Enzyme's
+## On the GPU, today, the padded versions are much faster than Enzyme's
 
-At $N = 10^6$ the Enzyme GPU gradient takes `{python} ms(t("enzyme", "gpu", 10**6))`,
+At $N = 10^5$ the Enzyme GPU gradient takes `{python} ms(t("enzyme", "gpu", 10**5))`,
+against `{python} ms(t("jax", "gpu", 10**5))` for JAX and
+`{python} ms(t("reactant", "gpu", 10**5))` for Reactant. At $N = 10^6$ it takes
+`{python} ms(t("enzyme", "gpu", 10**6))`,
 `{python} f'{t("enzyme", "gpu", 10**6) / t("enzyme", "gpu", 10**6, "forward_s"):.0f}'`× its
-own forward pass. JAX takes `{python} ms(t("jax", "gpu", 10**6))`.
+own forward pass.
 
 The reason is how Enzyme compiles reverse-mode GPU kernels with a data-dependent inner
 loop: it stores values for every inner iteration in device `malloc` memory, in both the
 augmented forward kernel and the reverse kernel. With CUDA's default 8 MB device heap
-this crashes above about 30 000 particles, so the notebook raises the heap to 2 GiB.
+this crashes above about 30 000 particles, so the notebook raises the heap to 4 GiB.
 A branch-free kernel and a fixed-trip-count kernel showed the same behaviour.
 :::
 

@@ -1,0 +1,87 @@
+{
+  "example": "03-compaction",
+  "impl": "jax",
+  "device": "gpu",
+  "records": [
+    {
+      "dtype": "Float64",
+      "variant": "masked",
+      "N": 10000,
+      "compile_s": 0.0037300439998944057,
+      "peak_mem_bytes": 25091192,
+      "forward_s": 0.0010172969996347092,
+      "grad_s": 0.0019795514999714214,
+      "error": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "masked",
+      "N": 100000,
+      "compile_s": 0.007301642999664182,
+      "peak_mem_bytes": 252012152,
+      "forward_s": 0.0024689935007700115,
+      "grad_s": 0.004579584000566683,
+      "error": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "masked",
+      "N": 1000000,
+      "compile_s": 0.08543543499945372,
+      "peak_mem_bytes": 2520012152,
+      "forward_s": 0.010893503000261262,
+      "grad_s": 0.028578916999322246,
+      "error": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "masked",
+      "N": 10000000,
+      "compile_s": null,
+      "peak_mem_bytes": 25200012408,
+      "forward_s": null,
+      "grad_s": null,
+      "error": "RESOURCE_EXHAUSTED: Out of memory while trying to allocate 23.47GiB with allocator GPU_0_bfc on device 0."
+    },
+    {
+      "dtype": "Float64",
+      "variant": "compacted",
+      "N": 10000,
+      "compile_s": 0.004459334999410203,
+      "peak_mem_bytes": 341904,
+      "forward_s": 0.001899049500025285,
+      "grad_s": 0.002496525000424299,
+      "error": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "compacted",
+      "N": 100000,
+      "compile_s": 0.0053041489991301205,
+      "peak_mem_bytes": 2987152,
+      "forward_s": 0.0027317920003042673,
+      "grad_s": 0.003434052499869722,
+      "error": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "compacted",
+      "N": 1000000,
+      "compile_s": 0.009535679000691744,
+      "peak_mem_bytes": 29223056,
+      "forward_s": 0.0067159240006731125,
+      "grad_s": 0.007610900000145193,
+      "error": null
+    },
+    {
+      "dtype": "Float64",
+      "variant": "compacted",
+      "N": 10000000,
+      "compile_s": 0.05593776099885872,
+      "peak_mem_bytes": 284366992,
+      "forward_s": 0.04956313299953763,
+      "grad_s": 0.052610304999689106,
+      "error": null
+    }
+  ]
+}

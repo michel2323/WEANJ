@@ -30,8 +30,14 @@ gpu-check:
 	fi; echo "GPU idle ($$used MiB in use)"
 
 # Rendering a single file ignores `freeze`, so this re-executes each notebook.
+# Quarto keeps Julia notebook workers alive after a render, and a Reactant worker keeps
+# most of the GPU reserved, so stop them between notebooks and wait for an idle GPU.
 run-gpu: gpu-check
-	@for f in $(SOURCES); do echo "== $$f"; $(QUARTO) render $$f || exit 1; done
+	@for f in $(SOURCES); do \
+	  echo "== $$f"; $(QUARTO) render $$f || exit 1; \
+	  pkill -f "julia.*--startup-file=no" || true; sleep 5; \
+	  $(MAKE) --no-print-directory gpu-check || exit 1; \
+	done
 	$(QUARTO) render
 
 render:

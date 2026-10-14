@@ -1,40 +1,40 @@
 {
     "records": [
         {
-            "dtype": "Float32",
+            "dtype": "Float64",
             "N": 1000,
-            "forward_s": 0.000255005,
-            "grad_s": 0.0029003915,
-            "compile_s": 6.893680348,
+            "forward_s": 0.0016280140000000001,
+            "grad_s": 0.0072233865,
+            "compile_s": 0.145545936,
             "peak_mem_bytes": null,
             "slots": 90680
         },
         {
-            "dtype": "Float32",
+            "dtype": "Float64",
             "N": 10000,
-            "forward_s": 0.00040906950000000003,
-            "grad_s": 0.009578816,
+            "forward_s": 0.0019172605,
+            "grad_s": 0.0135875215,
             "compile_s": null,
             "peak_mem_bytes": null,
             "slots": 945728
         },
         {
-            "dtype": "Float32",
+            "dtype": "Float64",
             "N": 100000,
-            "forward_s": 0.00080197,
-            "grad_s": 0.078393507,
+            "forward_s": 0.004496671,
+            "grad_s": 0.119108044,
             "compile_s": null,
             "peak_mem_bytes": null,
             "slots": 9097134
         },
         {
-            "dtype": "Float32",
+            "dtype": "Float64",
             "N": 1000000,
-            "forward_s": 0.005415931,
-            "grad_s": 1.053119911,
+            "forward_s": 0.030626199,
+            "grad_s": 2.572590426,
             "compile_s": null,
             "peak_mem_bytes": null,
-            "slots": 91137908
+            "slots": 91137740
         }
     ],
     "example": "01-particles",

@@ -1,0 +1,172 @@
+{
+    "records": [
+        {
+            "dtype": "Float64",
+            "variant": "lexicographic",
+            "N": 1024,
+            "n": 32,
+            "K": 100,
+            "forward_s": 0.0004349325,
+            "grad_s": 0.0008763915,
+            "compile_s": 0.00088916,
+            "peak_mem_bytes": 26968
+        },
+        {
+            "dtype": "Float64",
+            "variant": "lexicographic",
+            "N": 4096,
+            "n": 64,
+            "K": 100,
+            "forward_s": 0.0021318574999999998,
+            "grad_s": 0.004139713,
+            "compile_s": null,
+            "peak_mem_bytes": 102744
+        },
+        {
+            "dtype": "Float64",
+            "variant": "lexicographic",
+            "N": 16384,
+            "n": 128,
+            "K": 100,
+            "forward_s": 0.009952583000000001,
+            "grad_s": 0.0186524275,
+            "compile_s": null,
+            "peak_mem_bytes": 401752
+        },
+        {
+            "dtype": "Float64",
+            "variant": "lexicographic",
+            "N": 65536,
+            "n": 256,
+            "K": 100,
+            "forward_s": 0.042688108,
+            "grad_s": 0.078593647,
+            "compile_s": null,
+            "peak_mem_bytes": 1589592
+        },
+        {
+            "dtype": "Float64",
+            "variant": "lexicographic",
+            "N": 262144,
+            "n": 512,
+            "K": 100,
+            "forward_s": 0.177598719,
+            "grad_s": 0.325749738,
+            "compile_s": null,
+            "peak_mem_bytes": 6324568
+        },
+        {
+            "dtype": "Float64",
+            "variant": "lexicographic",
+            "N": 1048576,
+            "n": 1024,
+            "K": 100,
+            "forward_s": 0.730355748,
+            "grad_s": 1.318426119,
+            "compile_s": null,
+            "peak_mem_bytes": 25231704
+        },
+        {
+            "dtype": "Float64",
+            "variant": "red-black",
+            "N": 1024,
+            "n": 32,
+            "K": 100,
+            "forward_s": 0.0003454495,
+            "grad_s": 0.0027037615,
+            "compile_s": 0.002945337,
+            "peak_mem_bytes": 312360
+        },
+        {
+            "dtype": "Float64",
+            "variant": "red-black",
+            "N": 4096,
+            "n": 64,
+            "K": 100,
+            "forward_s": 0.001224293,
+            "grad_s": 0.008138822,
+            "compile_s": null,
+            "peak_mem_bytes": 517368
+        },
+        {
+            "dtype": "Float64",
+            "variant": "red-black",
+            "N": 16384,
+            "n": 128,
+            "K": 100,
+            "forward_s": 0.004395461,
+            "grad_s": 0.032836516499999996,
+            "compile_s": null,
+            "peak_mem_bytes": 1332408
+        },
+        {
+            "dtype": "Float64",
+            "variant": "red-black",
+            "N": 65536,
+            "n": 256,
+            "K": 100,
+            "forward_s": 0.016652242,
+            "grad_s": 0.167094145,
+            "compile_s": null,
+            "peak_mem_bytes": 4561688
+        },
+        {
+            "dtype": "Float64",
+            "variant": "red-black",
+            "N": 262144,
+            "n": 512,
+            "K": 100,
+            "forward_s": 0.065567411,
+            "grad_s": 0.517138217,
+            "compile_s": null,
+            "peak_mem_bytes": 17452256
+        },
+        {
+            "dtype": "Float64",
+            "variant": "red-black",
+            "N": 1048576,
+            "n": 1024,
+            "K": 100,
+            "forward_s": 0.263517895,
+            "grad_s": 3.476960481,
+            "compile_s": null,
+            "peak_mem_bytes": 68949216
+        },
+        {
+            "dtype": "Float64",
+            "variant": "lexicographic",
+            "N": 65536,
+            "n": 256,
+            "K": 10,
+            "forward_s": null,
+            "grad_s": null,
+            "compile_s": null,
+            "peak_mem_bytes": 1589592
+        },
+        {
+            "dtype": "Float64",
+            "variant": "lexicographic",
+            "N": 65536,
+            "n": 256,
+            "K": 100,
+            "forward_s": null,
+            "grad_s": null,
+            "compile_s": null,
+            "peak_mem_bytes": 1589592
+        },
+        {
+            "dtype": "Float64",
+            "variant": "lexicographic",
+            "N": 65536,
+            "n": 256,
+            "K": 1000,
+            "forward_s": null,
+            "grad_s": null,
+            "compile_s": null,
+            "peak_mem_bytes": 1589592
+        }
+    ],
+    "example": "02-gauss-seidel",
+    "device": "cpu",
+    "impl": "enzyme"
+}

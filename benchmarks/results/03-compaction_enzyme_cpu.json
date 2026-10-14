@@ -1,0 +1,39 @@
+{
+    "records": [
+        {
+            "dtype": "Float64",
+            "N": 10000,
+            "forward_s": 0.0008835685,
+            "grad_s": 0.000987996,
+            "compile_s": 0.411659614,
+            "peak_mem_bytes": 115128
+        },
+        {
+            "dtype": "Float64",
+            "N": 100000,
+            "forward_s": 0.0088745015,
+            "grad_s": 0.023716128500000003,
+            "compile_s": null,
+            "peak_mem_bytes": 850440
+        },
+        {
+            "dtype": "Float64",
+            "N": 1000000,
+            "forward_s": 0.094127525,
+            "grad_s": 0.275931063,
+            "compile_s": null,
+            "peak_mem_bytes": 8238960
+        },
+        {
+            "dtype": "Float64",
+            "N": 10000000,
+            "forward_s": 1.253365925,
+            "grad_s": 3.180571547,
+            "compile_s": null,
+            "peak_mem_bytes": 81794664
+        }
+    ],
+    "example": "03-compaction",
+    "device": "cpu",
+    "impl": "enzyme"
+}

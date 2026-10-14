@@ -1,0 +1,161 @@
+{
+  "example": "02-gauss-seidel",
+  "impl": "jax",
+  "device": "cpu",
+  "records": [
+    {
+      "dtype": "Float64",
+      "variant": "lexicographic",
+      "N": 1024,
+      "n": 32,
+      "K": 100,
+      "forward_s": 0.003557850500328641,
+      "grad_s": 0.009861512000497896,
+      "compile_s": 0.4027409890004492,
+      "peak_mem_bytes": 39408
+    },
+    {
+      "dtype": "Float64",
+      "variant": "lexicographic",
+      "N": 4096,
+      "n": 64,
+      "K": 100,
+      "forward_s": 0.009301266500187921,
+      "grad_s": 0.04666396300035558,
+      "compile_s": 0.5175145009998232,
+      "peak_mem_bytes": 142448
+    },
+    {
+      "dtype": "Float64",
+      "variant": "lexicographic",
+      "N": 16384,
+      "n": 128,
+      "K": 100,
+      "forward_s": 0.027550921499823744,
+      "grad_s": 0.24616591799986054,
+      "compile_s": 0.6252670260000741,
+      "peak_mem_bytes": 545136
+    },
+    {
+      "dtype": "Float64",
+      "variant": "lexicographic",
+      "N": 65536,
+      "n": 256,
+      "K": 100,
+      "forward_s": 0.09969599099986226,
+      "grad_s": 3.718064362000405,
+      "compile_s": 4.0008020240002224,
+      "peak_mem_bytes": 2136944
+    },
+    {
+      "dtype": "Float64",
+      "variant": "lexicographic",
+      "N": 262144,
+      "n": 512,
+      "K": 100,
+      "forward_s": 0.5178220750003675,
+      "grad_s": 19.701803093999843,
+      "compile_s": 24.26472297500004,
+      "peak_mem_bytes": 8466288
+    },
+    {
+      "dtype": "Float64",
+      "variant": "red-black",
+      "N": 1024,
+      "n": 32,
+      "K": 100,
+      "forward_s": 0.0006125054997028201,
+      "grad_s": 0.0027517195003383677,
+      "compile_s": 0.2660473810010444,
+      "peak_mem_bytes": 76488
+    },
+    {
+      "dtype": "Float64",
+      "variant": "red-black",
+      "N": 4096,
+      "n": 64,
+      "K": 100,
+      "forward_s": 0.0016034520003813668,
+      "grad_s": 0.009107543000027363,
+      "compile_s": 0.26534343599996646,
+      "peak_mem_bytes": 287432
+    },
+    {
+      "dtype": "Float64",
+      "variant": "red-black",
+      "N": 16384,
+      "n": 128,
+      "K": 100,
+      "forward_s": 0.008176101500794175,
+      "grad_s": 0.042133770999498665,
+      "compile_s": 0.3462256229995546,
+      "peak_mem_bytes": 1114824
+    },
+    {
+      "dtype": "Float64",
+      "variant": "red-black",
+      "N": 65536,
+      "n": 256,
+      "K": 100,
+      "forward_s": 0.04694587150061125,
+      "grad_s": 0.14375954600109253,
+      "compile_s": 0.5512710359998891,
+      "peak_mem_bytes": 4391624
+    },
+    {
+      "dtype": "Float64",
+      "variant": "red-black",
+      "N": 262144,
+      "n": 512,
+      "K": 100,
+      "forward_s": 0.16979422599979443,
+      "grad_s": 0.4293840270001965,
+      "compile_s": 0.7625194439988263,
+      "peak_mem_bytes": 17433288
+    },
+    {
+      "dtype": "Float64",
+      "variant": "red-black",
+      "N": 1048576,
+      "n": 1024,
+      "K": 100,
+      "forward_s": 0.7248998310005845,
+      "grad_s": 1.8066914580012963,
+      "compile_s": 2.088366935000522,
+      "peak_mem_bytes": 69468872
+    },
+    {
+      "dtype": "Float64",
+      "variant": "lexicographic",
+      "N": 65536,
+      "n": 256,
+      "K": 10,
+      "forward_s": null,
+      "grad_s": null,
+      "compile_s": null,
+      "peak_mem_bytes": 2136944
+    },
+    {
+      "dtype": "Float64",
+      "variant": "lexicographic",
+      "N": 65536,
+      "n": 256,
+      "K": 100,
+      "forward_s": null,
+      "grad_s": null,
+      "compile_s": null,
+      "peak_mem_bytes": 2136944
+    },
+    {
+      "dtype": "Float64",
+      "variant": "lexicographic",
+      "N": 65536,
+      "n": 256,
+      "K": 1000,
+      "forward_s": null,
+      "grad_s": null,
+      "compile_s": null,
+      "peak_mem_bytes": 2136944
+    }
+  ]
+}

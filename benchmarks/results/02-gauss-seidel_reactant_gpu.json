@@ -1,0 +1,95 @@
+{
+    "records": [
+        {
+            "dtype": "Float64",
+            "variant": "lexicographic",
+            "N": 1024,
+            "n": 32,
+            "K": 100,
+            "forward_s": 1.113408963,
+            "grad_s": 2.1212477654999997,
+            "compile_s": 1.146638731,
+            "peak_mem_bytes": null
+        },
+        {
+            "dtype": "Float64",
+            "variant": "lexicographic",
+            "N": 4096,
+            "n": 64,
+            "K": 100,
+            "forward_s": 4.421362343,
+            "grad_s": 8.3399312405,
+            "compile_s": 1.179406612,
+            "peak_mem_bytes": null
+        },
+        {
+            "dtype": "Float64",
+            "variant": "red-black",
+            "N": 1024,
+            "n": 32,
+            "K": 100,
+            "forward_s": 0.0015191245,
+            "grad_s": 0.0023299935,
+            "compile_s": 0.848510994,
+            "peak_mem_bytes": null
+        },
+        {
+            "dtype": "Float64",
+            "variant": "red-black",
+            "N": 4096,
+            "n": 64,
+            "K": 100,
+            "forward_s": 0.0014842425,
+            "grad_s": 0.0025459335,
+            "compile_s": 0.87010719,
+            "peak_mem_bytes": null
+        },
+        {
+            "dtype": "Float64",
+            "variant": "red-black",
+            "N": 16384,
+            "n": 128,
+            "K": 100,
+            "forward_s": 0.001403372,
+            "grad_s": 0.0025762075000000002,
+            "compile_s": 0.978641592,
+            "peak_mem_bytes": null
+        },
+        {
+            "dtype": "Float64",
+            "variant": "red-black",
+            "N": 65536,
+            "n": 256,
+            "K": 100,
+            "forward_s": 0.0018153235,
+            "grad_s": 0.0029552565,
+            "compile_s": 0.883343552,
+            "peak_mem_bytes": null
+        },
+        {
+            "dtype": "Float64",
+            "variant": "red-black",
+            "N": 262144,
+            "n": 512,
+            "K": 100,
+            "forward_s": 0.003167238,
+            "grad_s": 0.006099282,
+            "compile_s": 0.927626044,
+            "peak_mem_bytes": null
+        },
+        {
+            "dtype": "Float64",
+            "variant": "red-black",
+            "N": 1048576,
+            "n": 1024,
+            "K": 100,
+            "forward_s": 0.006715273,
+            "grad_s": 0.016798968,
+            "compile_s": 0.96490789,
+            "peak_mem_bytes": null
+        }
+    ],
+    "example": "02-gauss-seidel",
+    "device": "gpu",
+    "impl": "reactant"
+}

@@ -1,0 +1,137 @@
+---
+title: "02. Gauss–Seidel — JAX"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+import functools
+import numpy as np
+import weanj  # sets XLA_PYTHON_CLIENT_PREALLOCATE=false before JAX initialises
+import jax
+import jax.numpy as jnp
+
+jax.config.update("jax_enable_x64", True)
+EXAMPLE, K_CHECK = "02-gauss-seidel", 20
+d = weanj.load_inputs(EXAMPLE)
+theta0, uobs0 = jnp.asarray(d["theta"]), jnp.asarray(d["uobs"])
+```
+
+```{python}
+#| label: loss-lex
+# Lexicographic Gauss–Seidel. Arrays are immutable and loop bodies must be pure, so
+# the sweep is a scan over columns, each a scan over rows carrying the new u[i-1, j].
+# Same update order as the Julia loop (i fastest, then j).
+@functools.partial(jax.jit, static_argnums=2)
+def gs_loss(theta, uobs, K):
+    n = theta.shape[0]
+    h2 = 1.0 / (n + 1) ** 2
+
+    def column(u, j):
+        left, old, right = u[:, j], u[:, j + 1], u[:, j + 2]
+
+        def point(below, i):  # below = new u[i-1, j]
+            new = (h2 * theta[i, j] + below + old[i + 2] + left[i + 1] + right[i + 1]) / 4
+            return new, new
+
+        _, col = jax.lax.scan(point, old[0], jnp.arange(n))
+        return u.at[1:n + 1, j + 1].set(col), None
+
+    def sweep(u, _):
+        return jax.lax.scan(column, u, jnp.arange(n))[0], None
+
+    u, _ = jax.lax.scan(sweep, jnp.zeros((n + 2, n + 2), theta.dtype), None, length=K)
+    return jnp.sum((u[1:-1, 1:-1] - uobs) ** 2)
+```
+
+```{python}
+#| label: grad-lex
+gs_grad = jax.jit(jax.grad(gs_loss), static_argnums=2)
+g_lex = gs_grad(theta0, uobs0, K_CHECK)
+print(f"loss = {float(gs_loss(theta0, uobs0, K_CHECK)):.12f}   ‖∇loss‖ = {float(jnp.linalg.norm(g_lex)):.6e}")
+```
+
+```{python}
+#| label: loss-rb
+# Red-black Gauss–Seidel: the reformulation JAX users actually write. Each colour is
+# one vectorised stencil, selected with a mask.
+@functools.partial(jax.jit, static_argnums=2)
+def rb_loss(theta, uobs, K):
+    n = theta.shape[0]
+    h2 = 1.0 / (n + 1) ** 2
+    i, j = jnp.meshgrid(jnp.arange(2, n + 2), jnp.arange(2, n + 2), indexing="ij")
+    red = (i + j) % 2 == 0  # 1-based indices, as in the Julia kernel
+
+    def half(u, colour):
+        new = (h2 * theta + u[:-2, 1:-1] + u[2:, 1:-1] + u[1:-1, :-2] + u[1:-1, 2:]) / 4
+        return u.at[1:-1, 1:-1].set(jnp.where(colour, new, u[1:-1, 1:-1]))
+
+    def sweep(u, _):
+        return half(half(u, red), ~red), None
+
+    u, _ = jax.lax.scan(sweep, jnp.zeros((n + 2, n + 2), theta.dtype), None, length=K)
+    return jnp.sum((u[1:-1, 1:-1] - uobs) ** 2)
+```
+
+```{python}
+#| label: grad-rb
+rb_grad = jax.jit(jax.grad(rb_loss), static_argnums=2)
+g_rb = rb_grad(theta0, uobs0, K_CHECK)
+print(f"loss = {float(rb_loss(theta0, uobs0, K_CHECK)):.12f}   ‖∇loss‖ = {float(jnp.linalg.norm(g_rb)):.6e}")
+```
+
+```{python}
+#| label: check
+e1 = weanj.fd_check(lambda t: gs_loss(jnp.asarray(t), uobs0, K_CHECK), np.asarray(theta0), np.asarray(g_lex), n=10, h=1e-2)
+e2 = weanj.fd_check(lambda t: rb_loss(jnp.asarray(t), uobs0, K_CHECK), np.asarray(theta0), np.asarray(g_rb), n=10, h=1e-2)
+weanj.save_gradient(EXAMPLE, "jax-lex", np.asarray(g_lex))
+weanj.save_gradient(EXAMPLE, "jax-rb", np.asarray(g_rb))
+print(f"finite differences: lexicographic {e1:.1e}, red-black {e2:.1e}")
+```
+
+```{python}
+#| label: bench
+import time
+
+ns, K, budget_s = [32, 64, 128, 256, 512, 1024], 100, 5.0
+
+def inputs(n, seed=1):
+    rng = np.random.default_rng(seed)
+    return jnp.asarray(rng.standard_normal((n, n))), jnp.asarray(0.01 * rng.standard_normal((n, n)))
+
+def temp_bytes(fn, *args):
+    """XLA's scratch memory for the compiled gradient (excludes inputs/outputs)."""
+    return int(fn.lower(*args).compile().memory_analysis().temp_size_in_bytes)
+
+def sweep(variant, loss, grad):
+    records = []
+    for n in ns:
+        theta, uobs = inputs(n)
+        t0 = time.perf_counter()
+        jax.block_until_ready(grad(theta, uobs, K))
+        compile_s = time.perf_counter() - t0
+        samples = 3 if n >= 512 else 10
+        r = dict(dtype="Float64", variant=variant, N=n * n, n=n, K=K,
+                 forward_s=weanj.time_median(lambda: loss(theta, uobs, K), sync=jax.block_until_ready, samples=samples),
+                 grad_s=weanj.time_median(lambda: grad(theta, uobs, K), sync=jax.block_until_ready, samples=samples),
+                 compile_s=compile_s, peak_mem_bytes=temp_bytes(grad, theta, uobs, K))
+        records.append(r)
+        if r["grad_s"] > budget_s:
+            break
+    return records
+
+for device in ("cpu", "gpu"):
+    with jax.default_device(jax.devices(device)[0]):
+        records = sweep("lexicographic", gs_loss, gs_grad) + sweep("red-black", rb_loss, rb_grad)
+        if device == "cpu":  # gradient memory against the number of sweeps K, at n = 256
+            theta, uobs = inputs(256)
+            for Km in (10, 100, 1000):
+                records.append(dict(dtype="Float64", variant="lexicographic", N=256 * 256, n=256, K=Km,
+                                    forward_s=None, grad_s=None, compile_s=None,
+                                    peak_mem_bytes=temp_bytes(gs_grad, theta, uobs, Km)))
+    weanj.write_results(EXAMPLE, "jax", device, records)
+    for r in records:
+        if r["grad_s"] is not None:
+            print(f"{device} {r['variant']:<13} n={r['n']:<5d} forward {1e3*r['forward_s']:9.3f} ms  "
+                  f"gradient {1e3*r['grad_s']:9.3f} ms  temp {r['peak_mem_bytes']/2**20:8.2f} MiB")
+```

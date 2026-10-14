@@ -1,0 +1,109 @@
+---
+title: "02. Gauss–Seidel — Reactant.jl"
+engine: julia
+julia:
+  exeflags: ["+1.12", "--project=../../julia"]
+---
+
+```{julia}
+#| label: setup
+using WEANJ, Reactant, Enzyme, Printf
+include("common.jl")
+Reactant.set_default_backend("gpu")
+
+d = ensure_inputs()
+θ0, uobs0 = Reactant.to_rarray(d["theta"]), Reactant.to_rarray(d["uobs"])
+```
+
+```{julia}
+#| label: loss-lex
+# The same triple loop as the Enzyme version. Loops over traced data must be marked
+# @trace, and indexing a traced array at a traced position must be explicitly allowed.
+# Each scalar update becomes one step of an XLA while loop.
+function gs_loss(θ, uobs, K)
+    n = size(θ, 1)
+    h2 = 1.0 / (n + 1)^2
+    u = Reactant.Ops.fill(0.0, (n + 2, n + 2))
+    @trace for _ in 1:K
+        @trace for j in 2:n+1
+            @trace for i in 2:n+1
+                Reactant.@allowscalar u[i, j] =
+                    (h2 * θ[i-1, j-1] + u[i-1, j] + u[i+1, j] + u[i, j-1] + u[i, j+1]) / 4
+            end
+        end
+    end
+    return sum((u[2:end-1, 2:end-1] .- uobs) .^ 2)
+end
+```
+
+```{julia}
+#| label: loss-rb
+# Red-black as array operations: one masked stencil per colour. The colour mask is built
+# from traced iota arrays rather than captured as a Julia constant: with a constant mask
+# compilation took minutes at n = 64.
+function rb_loss(θ, uobs, K)
+    n = size(θ, 1)
+    h2 = 1.0 / (n + 1)^2
+    i = Reactant.Ops.iota(Int64, [n, n]; iota_dimension=1)
+    j = Reactant.Ops.iota(Int64, [n, n]; iota_dimension=2)
+    red = iseven.(i .+ j)
+    u = Reactant.Ops.fill(0.0, (n + 2, n + 2))
+    @trace for _ in 1:K
+        for colour in (red, .!red)
+            new = (h2 .* θ .+ u[1:end-2, 2:end-1] .+ u[3:end, 2:end-1] .+
+                   u[2:end-1, 1:end-2] .+ u[2:end-1, 3:end]) ./ 4
+            u[2:end-1, 2:end-1] = ifelse.(colour, new, u[2:end-1, 2:end-1])
+        end
+    end
+    return sum((u[2:end-1, 2:end-1] .- uobs) .^ 2)
+end
+```
+
+```{julia}
+#| label: grad
+gradient(f, θ, uobs, K) = Enzyme.gradient(Reverse, Const(f), θ, Const(uobs), Const(K))[1]
+
+g_lex = Array((@compile gradient(gs_loss, θ0, uobs0, K_CHECK))(gs_loss, θ0, uobs0, K_CHECK))
+g_rb = Array((@compile gradient(rb_loss, θ0, uobs0, K_CHECK))(rb_loss, θ0, uobs0, K_CHECK))
+@printf "‖∇loss‖: lexicographic %.6e, red-black %.6e\n" sqrt(sum(abs2, g_lex)) sqrt(sum(abs2, g_rb))
+```
+
+```{julia}
+#| label: check
+lex_c = @compile gs_loss(θ0, uobs0, K_CHECK)
+rb_c = @compile rb_loss(θ0, uobs0, K_CHECK)
+θh = Array(θ0)
+e1 = fd_check(t -> Float64(lex_c(Reactant.to_rarray(t), uobs0, K_CHECK)), θh, g_lex; n=10, h=1e-2)
+e2 = fd_check(t -> Float64(rb_c(Reactant.to_rarray(t), uobs0, K_CHECK)), θh, g_rb; n=10, h=1e-2)
+save_gradient(EXAMPLE, "reactant-lex", g_lex)
+save_gradient(EXAMPLE, "reactant-rb", g_rb)
+@printf "finite differences: lexicographic %.1e, red-black %.1e\n" e1 e2
+```
+
+```{julia}
+#| label: bench
+ns = [32, 64, 128, 256, 512, 1024]
+K = 100
+budget_s = 5.0
+records = []
+for (variant, f) in (("lexicographic", gs_loss), ("red-black", rb_loss))
+    for n in ns
+        θ, uobs = Reactant.to_rarray.(inputs(Float64, n))
+        compile_s = @elapsed begin
+            lf = @compile f(θ, uobs, K)
+            gf = @compile gradient(f, θ, uobs, K)
+        end
+        samples = n >= 512 ? 3 : 10
+        r = (; dtype="Float64", variant, N=n^2, n, K,
+             forward_s = time_median(() -> lf(θ, uobs, K); sync=Reactant.synchronize, samples),
+             grad_s    = time_median(() -> gf(f, θ, uobs, K); sync=Reactant.synchronize, samples),
+             compile_s, peak_mem_bytes = nothing)
+        push!(records, r)
+        r.grad_s > budget_s && break
+    end
+end
+write_results(EXAMPLE, "reactant", "gpu", records)
+for r in records
+    @printf "gpu %-13s n=%-5d forward %9.3f ms  gradient %9.3f ms  compile %5.1f s\n" r.variant r.n 1e3r.forward_s 1e3r.grad_s r.compile_s
+end
+```

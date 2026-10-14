@@ -1,0 +1,87 @@
+{
+    "records": [
+        {
+            "dtype": "Float64",
+            "variant": "unrolled",
+            "N": 1000,
+            "iterations": 4,
+            "forward_s": 6.53545e-5,
+            "grad_s": 0.0001623285,
+            "compile_s": 0.00020922,
+            "peak_mem_bytes": 74200
+        },
+        {
+            "dtype": "Float64",
+            "variant": "unrolled",
+            "N": 10000,
+            "iterations": 3,
+            "forward_s": 0.0005156970000000001,
+            "grad_s": 0.0012239555,
+            "compile_s": null,
+            "peak_mem_bytes": 722200
+        },
+        {
+            "dtype": "Float64",
+            "variant": "unrolled",
+            "N": 100000,
+            "iterations": 3,
+            "forward_s": 0.006521486,
+            "grad_s": 0.015426807,
+            "compile_s": null,
+            "peak_mem_bytes": 7202200
+        },
+        {
+            "dtype": "Float64",
+            "variant": "unrolled",
+            "N": 1000000,
+            "iterations": 3,
+            "forward_s": 0.112562052,
+            "grad_s": 0.13031315,
+            "compile_s": null,
+            "peak_mem_bytes": 72002200
+        },
+        {
+            "dtype": "Float64",
+            "variant": "implicit",
+            "N": 1000,
+            "iterations": 4,
+            "forward_s": 7.674050000000001e-5,
+            "grad_s": 8.6599e-5,
+            "compile_s": 0.000124014,
+            "peak_mem_bytes": 40360
+        },
+        {
+            "dtype": "Float64",
+            "variant": "implicit",
+            "N": 10000,
+            "iterations": 3,
+            "forward_s": 0.0006113625,
+            "grad_s": 0.0007709290000000001,
+            "compile_s": null,
+            "peak_mem_bytes": 400360
+        },
+        {
+            "dtype": "Float64",
+            "variant": "implicit",
+            "N": 100000,
+            "iterations": 3,
+            "forward_s": 0.005154669,
+            "grad_s": 0.006441947,
+            "compile_s": null,
+            "peak_mem_bytes": 4000360
+        },
+        {
+            "dtype": "Float64",
+            "variant": "implicit",
+            "N": 1000000,
+            "iterations": 3,
+            "forward_s": 0.054074156,
+            "grad_s": 0.069106052,
+            "compile_s": null,
+            "peak_mem_bytes": 40000360
+        }
+    ],
+    "example": "04-newton",
+    "device": "cpu",
+    "impl": "enzyme"
+}

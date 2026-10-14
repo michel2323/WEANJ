@@ -1,0 +1,95 @@
+{
+  "example": "02-gauss-seidel",
+  "impl": "jax",
+  "device": "gpu",
+  "records": [
+    {
+      "dtype": "Float64",
+      "variant": "lexicographic",
+      "N": 1024,
+      "n": 32,
+      "K": 100,
+      "forward_s": 1.0683018224999614,
+      "grad_s": 1.8782991445004882,
+      "compile_s": 2.3851612150010624,
+      "peak_mem_bytes": 38744
+    },
+    {
+      "dtype": "Float64",
+      "variant": "lexicographic",
+      "N": 4096,
+      "n": 64,
+      "K": 100,
+      "forward_s": 4.231996750999315,
+      "grad_s": 7.322704239500126,
+      "compile_s": 7.809574425999017,
+      "peak_mem_bytes": 115288
+    },
+    {
+      "dtype": "Float64",
+      "variant": "red-black",
+      "N": 1024,
+      "n": 32,
+      "K": 100,
+      "forward_s": 0.0009838610003498616,
+      "grad_s": 0.001697873999546573,
+      "compile_s": 0.3100360129992623,
+      "peak_mem_bytes": 31280
+    },
+    {
+      "dtype": "Float64",
+      "variant": "red-black",
+      "N": 4096,
+      "n": 64,
+      "K": 100,
+      "forward_s": 0.0011782645005951053,
+      "grad_s": 0.001784444500117388,
+      "compile_s": 0.3533289959996182,
+      "peak_mem_bytes": 113200
+    },
+    {
+      "dtype": "Float64",
+      "variant": "red-black",
+      "N": 16384,
+      "n": 128,
+      "K": 100,
+      "forward_s": 0.0012482800002544536,
+      "grad_s": 0.001976835000277788,
+      "compile_s": 0.31021389700072177,
+      "peak_mem_bytes": 436784
+    },
+    {
+      "dtype": "Float64",
+      "variant": "red-black",
+      "N": 65536,
+      "n": 256,
+      "K": 100,
+      "forward_s": 0.002019130499320454,
+      "grad_s": 0.0031915554991428507,
+      "compile_s": 0.4733625389999361,
+      "peak_mem_bytes": 3286832
+    },
+    {
+      "dtype": "Float64",
+      "variant": "red-black",
+      "N": 262144,
+      "n": 512,
+      "K": 100,
+      "forward_s": 0.004092535999006941,
+      "grad_s": 0.007228679000036209,
+      "compile_s": 0.4228077089992439,
+      "peak_mem_bytes": 13125424
+    },
+    {
+      "dtype": "Float64",
+      "variant": "red-black",
+      "N": 1048576,
+      "n": 1024,
+      "K": 100,
+      "forward_s": 0.009075564999875496,
+      "grad_s": 0.019968115999290603,
+      "compile_s": 0.4344814790001692,
+      "peak_mem_bytes": 27331120
+    }
+  ]
+}

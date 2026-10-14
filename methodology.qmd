@@ -22,7 +22,10 @@ A failing check fails the build, so a published page always shows matching gradi
 
 ## Timing
 
-- Timing runs use **Float32**, as is usual on GPUs; the correctness check uses Float64.
+- Everything runs in **Float64**, timing included, so the timed code is exactly the code
+  whose gradient was checked. The laptop GPU used here has low Float64 throughput (as
+  most consumer GPUs do), which slows every GPU column; relative comparisons between
+  GPU columns are what matter.
 - Compile time (first call) is reported separately from run time. It matters for JAX and
   Reactant, which compile a whole graph, and for Enzyme, which compiles on first call.
 - Run time is the median of 10 calls after 2 warm-up calls. GPU work is synchronised

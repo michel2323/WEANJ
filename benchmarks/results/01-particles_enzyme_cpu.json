@@ -1,0 +1,43 @@
+{
+    "records": [
+        {
+            "dtype": "Float32",
+            "N": 1000,
+            "forward_s": 0.0010782825,
+            "grad_s": 0.004531645,
+            "compile_s": 0.625548833,
+            "peak_mem_bytes": null,
+            "slots": 90680
+        },
+        {
+            "dtype": "Float32",
+            "N": 10000,
+            "forward_s": 0.011942129,
+            "grad_s": 0.045617214,
+            "compile_s": null,
+            "peak_mem_bytes": null,
+            "slots": 945728
+        },
+        {
+            "dtype": "Float32",
+            "N": 100000,
+            "forward_s": 0.120691811,
+            "grad_s": 0.459504049,
+            "compile_s": null,
+            "peak_mem_bytes": null,
+            "slots": 9097134
+        },
+        {
+            "dtype": "Float32",
+            "N": 1000000,
+            "forward_s": 1.272440011,
+            "grad_s": 4.885648883,
+            "compile_s": null,
+            "peak_mem_bytes": null,
+            "slots": 91137908
+        }
+    ],
+    "example": "01-particles",
+    "device": "cpu",
+    "impl": "enzyme"
+}

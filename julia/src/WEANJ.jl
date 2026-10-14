@@ -30,19 +30,20 @@ end
 load_inputs(example::AbstractString) = npzread(data_path(example))
 
 """
-    time_median(f; sync=() -> nothing, warmup=2, samples=10)
+    time_median(f; sync=identity, warmup=2, samples=10)
 
-Median wall time of `f()` in seconds after `warmup` untimed calls. `sync` is called
-after every call inside the timed region (pass `CUDA.synchronize` for GPU work).
+Median wall time of `f()` in seconds after `warmup` untimed calls. `sync` receives the
+result of every call inside the timed region: pass `_ -> CUDA.synchronize()` for
+CUDA.jl work and `Reactant.synchronize` for Reactant results.
 """
-function time_median(f; sync=() -> nothing, warmup::Int=2, samples::Int=10)
+function time_median(f; sync=identity, warmup::Int=2, samples::Int=10)
     for _ in 1:warmup
-        f(); sync()
+        sync(f())
     end
     ts = Vector{Float64}(undef, samples)
     for i in 1:samples
         t0 = time_ns()
-        f(); sync()
+        sync(f())
         ts[i] = (time_ns() - t0) / 1e9
     end
     return median(ts)

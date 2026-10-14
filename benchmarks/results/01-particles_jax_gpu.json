@@ -1,0 +1,43 @@
+{
+  "example": "01-particles",
+  "impl": "jax",
+  "device": "gpu",
+  "records": [
+    {
+      "dtype": "Float32",
+      "N": 1000,
+      "forward_s": 0.0011337000760249794,
+      "grad_s": 0.0011564114829525352,
+      "compile_s": 3.2286553799640387,
+      "peak_mem_bytes": null,
+      "slots": 38995
+    },
+    {
+      "dtype": "Float32",
+      "N": 10000,
+      "forward_s": 0.0015115374699234962,
+      "grad_s": 0.0016968214767985046,
+      "compile_s": 3.8032795580802485,
+      "peak_mem_bytes": null,
+      "slots": 391775
+    },
+    {
+      "dtype": "Float32",
+      "N": 100000,
+      "forward_s": 0.004490425111725926,
+      "grad_s": 0.006960549973882735,
+      "compile_s": 4.092848144937307,
+      "peak_mem_bytes": null,
+      "slots": 3925355
+    },
+    {
+      "dtype": "Float32",
+      "N": 1000000,
+      "forward_s": 0.03854621096979827,
+      "grad_s": 0.06251123803667724,
+      "compile_s": 4.84912940103095,
+      "peak_mem_bytes": null,
+      "slots": 39270775
+    }
+  ]
+}

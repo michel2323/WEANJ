@@ -1,0 +1,43 @@
+{
+    "records": [
+        {
+            "dtype": "Float32",
+            "N": 1000,
+            "forward_s": 0.000340604,
+            "grad_s": 0.0006175825,
+            "compile_s": 23.280710449,
+            "peak_mem_bytes": null,
+            "slots": 180000
+        },
+        {
+            "dtype": "Float32",
+            "N": 10000,
+            "forward_s": 0.000727361,
+            "grad_s": 0.0013829215,
+            "compile_s": 8.426669972,
+            "peak_mem_bytes": null,
+            "slots": 1980000
+        },
+        {
+            "dtype": "Float32",
+            "N": 100000,
+            "forward_s": 0.000985596,
+            "grad_s": 0.005174172,
+            "compile_s": 9.62866648,
+            "peak_mem_bytes": null,
+            "slots": 21600000
+        },
+        {
+            "dtype": "Float32",
+            "N": 1000000,
+            "forward_s": 0.004810965,
+            "grad_s": 0.070753144,
+            "compile_s": 17.30047756,
+            "peak_mem_bytes": null,
+            "slots": 234000000
+        }
+    ],
+    "example": "01-particles",
+    "device": "gpu",
+    "impl": "reactant"
+}

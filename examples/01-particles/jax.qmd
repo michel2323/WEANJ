@@ -1,0 +1,127 @@
+---
+title: "01. Particles — JAX"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+import math
+import numpy as np
+import weanj  # sets XLA_PYTHON_CLIENT_PREALLOCATE=false before JAX initialises
+import jax
+import jax.numpy as jnp
+from jax_md import partition, space
+
+jax.config.update("jax_enable_x64", True)
+EXAMPLE = "01-particles"
+x0 = jnp.asarray(weanj.load_inputs(EXAMPLE)["x"].T)  # (N, 2); Julia stores 2×N
+```
+
+```{python}
+#| label: loss
+# Idiomatic JAX: jax-md's neighbour list. It is a fixed-capacity padded pair list;
+# `allocate` (outside jit) sizes it from the data, `update` (inside jit) refills it,
+# and `did_buffer_overflow` must be checked after every call.
+NUMBER_DENSITY, H, MASS = 10.0, 0.5, 1.0
+RC, RHO0 = 2 * H, NUMBER_DENSITY
+
+def box_size(n):
+    return math.sqrt(n / NUMBER_DENSITY)
+
+def W(r, h=H):
+    """2D cubic spline. No `if`: both branches are evaluated and selected."""
+    q = r / h
+    sigma = 10.0 / (7.0 * math.pi * h * h)
+    t = jnp.maximum(2.0 - q, 0.0)
+    return sigma * jnp.where(q < 1.0, 1.0 - 1.5 * q**2 + 0.75 * q**3, 0.25 * t**3)
+
+def make_loss(n, displacement):
+    w0 = MASS * float(W(0.0))  # self-contribution; jax-md's pair list excludes i == j
+
+    def loss(x, nbrs):
+        nbrs = nbrs.update(x)  # rebuild the cell list from the current positions
+        i, j = nbrs.idx
+        mask = i < n  # padded slots hold index n
+        dR = jax.vmap(displacement)(x[i], x[j])
+        dR = jnp.where(mask[:, None], dR, 1.0)  # padded dR = 0 would make ∇‖dR‖ NaN
+        r = jnp.sqrt(jnp.sum(dR**2, axis=1))
+        w = jnp.where(mask, MASS * W(r), 0.0)
+        rho = w0 + jax.ops.segment_sum(w, i, num_segments=n)
+        return jnp.sum((rho - RHO0) ** 2), nbrs
+
+    return loss
+
+class Particles:
+    """Jitted loss and gradient with jax-md's overflow-and-reallocate protocol."""
+
+    def __init__(self, x, capacity_multiplier=1.25):
+        self.n = x.shape[0]
+        L = box_size(self.n)
+        displacement, _ = space.periodic(L)
+        self.neighbor_fn = partition.neighbor_list(
+            displacement, L, RC, dr_threshold=0.0,
+            capacity_multiplier=capacity_multiplier, format=partition.Sparse)
+        self.nbrs = self.neighbor_fn.allocate(x)
+        loss = make_loss(self.n, displacement)
+        self._loss = jax.jit(loss)
+        self._grad = jax.jit(jax.grad(loss, has_aux=True))
+
+    def _checked(self, f, x):
+        out, nbrs = f(x, self.nbrs)
+        if nbrs.did_buffer_overflow:  # host sync, as in jax-md's examples
+            self.nbrs = self.neighbor_fn.allocate(x)
+            out, nbrs = f(x, self.nbrs)
+        self.nbrs = nbrs
+        return out
+
+    def loss(self, x):
+        return self._checked(self._loss, x)
+
+    def grad(self, x):
+        return self._checked(self._grad, x)
+```
+
+```{python}
+#| label: grad
+P0 = Particles(x0)
+g = P0.grad(x0)
+print(f"loss = {float(P0.loss(x0)):.10f}   ‖∇loss‖ = {float(jnp.linalg.norm(g)):.6f}")
+```
+
+```{python}
+#| label: check
+err = weanj.fd_check(lambda y: P0.loss(jnp.asarray(y)), np.asarray(x0), np.asarray(g), n=10)
+weanj.save_gradient(EXAMPLE, "jax", np.asarray(g).T)  # back to Julia's 2×N layout
+print(f"finite differences: max rel. error {err:.1e} on 10 components")
+```
+
+```{python}
+#| label: bench
+import time
+
+def positions(n, seed=1):
+    rng = np.random.default_rng(seed)
+    return (rng.random((n, 2)) * box_size(n)).astype(np.float32)
+
+Ns = [10**3, 10**4, 10**5, 10**6]
+for device in ("cpu", "gpu"):
+    records = []
+    with jax.default_device(jax.devices(device)[0]):
+        for N in Ns:
+            x = jnp.asarray(positions(N))
+            t0 = time.perf_counter()
+            P = Particles(x)
+            jax.block_until_ready(P.grad(x))
+            compile_s = time.perf_counter() - t0
+            samples = 3 if N >= 10**5 else 10
+            records.append(dict(
+                dtype="Float32", N=N,
+                forward_s=weanj.time_median(lambda: P.loss(x), sync=jax.block_until_ready, samples=samples),
+                grad_s=weanj.time_median(lambda: P.grad(x), sync=jax.block_until_ready, samples=samples),
+                compile_s=compile_s, peak_mem_bytes=None,
+                slots=int(P.nbrs.idx.shape[1])))
+    weanj.write_results(EXAMPLE, "jax", device, records)
+    for r in records:
+        print(f"{device}  N={r['N']:<8d} forward {1e3*r['forward_s']:9.3f} ms   "
+              f"gradient {1e3*r['grad_s']:9.3f} ms   compile {r['compile_s']:5.1f} s")
+```

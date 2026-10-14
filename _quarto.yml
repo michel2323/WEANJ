@@ -20,6 +20,9 @@ website:
       - index.qmd
       - methodology.qmd
       - setup.qmd
+      - section: Examples
+        contents:
+          - examples/01-particles/index.qmd
       - smoke/index.qmd
 
 format:

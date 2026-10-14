@@ -1,0 +1,43 @@
+{
+    "records": [
+        {
+            "dtype": "Float32",
+            "N": 1000,
+            "forward_s": 0.000255005,
+            "grad_s": 0.0029003915,
+            "compile_s": 6.893680348,
+            "peak_mem_bytes": null,
+            "slots": 90680
+        },
+        {
+            "dtype": "Float32",
+            "N": 10000,
+            "forward_s": 0.00040906950000000003,
+            "grad_s": 0.009578816,
+            "compile_s": null,
+            "peak_mem_bytes": null,
+            "slots": 945728
+        },
+        {
+            "dtype": "Float32",
+            "N": 100000,
+            "forward_s": 0.00080197,
+            "grad_s": 0.078393507,
+            "compile_s": null,
+            "peak_mem_bytes": null,
+            "slots": 9097134
+        },
+        {
+            "dtype": "Float32",
+            "N": 1000000,
+            "forward_s": 0.005415931,
+            "grad_s": 1.053119911,
+            "compile_s": null,
+            "peak_mem_bytes": null,
+            "slots": 91137908
+        }
+    ],
+    "example": "01-particles",
+    "device": "gpu",
+    "impl": "enzyme"
+}

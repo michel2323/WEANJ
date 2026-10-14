@@ -31,7 +31,7 @@ Base.convert(::Type{Params{T}}, p::Params) where {T} =
     Params{T}(T(p.L), T(p.h), T(p.m), T(p.ρ0), p.nc)
 
 "2D cubic-spline kernel (Monaghan 1992), C², support q = r/h ∈ [0, 2]."
-@inline function W(r::T, h::T) where {T}
+@inline function W(r, h::T) where {T}
     q = r / h
     σ = T(10) / (T(7) * T(π) * h * h)
     if q < 1

@@ -1,0 +1,172 @@
+---
+title: "01. Particles: sort, cell lists, and data-dependent neighbour loops"
+description: "An SPH density loss whose efficient form sorts particles into cells and loops over a data-dependent number of neighbours."
+jupyter: python3
+---
+
+```{python}
+#| echo: false
+import weanj
+import pandas as pd
+EXAMPLE = "01-particles"
+res = weanj.load_results(EXAMPLE)
+def t(impl, device, N, col="grad_s"):
+    row = res[(res.impl == impl) & (res.device == device) & (res.N == N)]
+    return float(row[col].iloc[0])
+def ms(v):
+    return f"{1e3 * v:.1f} ms" if v >= 1e-3 else f"{1e6 * v:.0f} µs"
+```
+
+## The problem
+
+$N$ particles in a periodic square box, each with an SPH density
+$$\rho_i = \sum_j m\, W(\lVert x_i - x_j\rVert, h),$$
+where $W$ is the 2D cubic-spline kernel with support $2h$, and the loss
+$$\mathcal{L}(x) = \sum_i (\rho_i - \rho_0)^2 .$$
+We want $\nabla_x \mathcal{L}$, the gradient with respect to all particle positions. The
+box grows with $N$ so every particle has about 31 neighbours.
+
+This loss came up in a [Slack discussion](https://github.com/michel2323/WEANJ/blob/main/AGENTS.md)
+as "something JAX can't do because it needs `sort!`". That is not quite right:
+`jax.lax.sort` is differentiable. What matters is how the efficient algorithm works:
+
+1. compute each particle's **cell** (integer, zero derivative),
+2. **sort** particles by cell so each cell is contiguous in memory,
+3. for each particle, **loop over the 3×3 neighbouring cells**, each a range
+   `start[c]:start[c+1]-1` whose length depends on the data,
+4. accumulate kernel-weighted contributions.
+
+The gradient flows through the gather in step 2 (as a permutation) and through step 4.
+Steps 1–3 only decide *which* pairs interact.
+
+## Code
+
+The Enzyme version is the algorithm above as plain loops, differentiated as written: on
+the CPU the whole pipeline, including the counting sort, is inside `autodiff`. JAX and
+Reactant cannot express step 3 (a loop whose bounds come from the data), so they
+regularise it. JAX uses jax-md's padded neighbour list; Reactant uses a padded cell
+list. Both must pick a capacity from the data and check for overflow.
+
+::: {.panel-tabset group="impl"}
+## Enzyme.jl (CPU)
+{{< embed enzyme.qmd#loss-cpu echo=true >}}
+{{< embed enzyme.qmd#grad-cpu echo=true >}}
+
+## Enzyme.jl (GPU)
+{{< embed enzyme.qmd#loss-gpu echo=true >}}
+{{< embed enzyme.qmd#grad-gpu echo=true >}}
+
+## Reactant.jl
+{{< embed reactant.qmd#loss echo=true >}}
+{{< embed reactant.qmd#grad echo=true >}}
+
+## JAX
+{{< embed jax.qmd#loss echo=true >}}
+{{< embed jax.qmd#grad echo=true >}}
+:::
+
+Shared definitions (`Params`, the kernel `W`, the minimum image, the input) are in
+[`common.jl`](https://github.com/michel2323/WEANJ/blob/main/examples/01-particles/common.jl).
+
+## Same gradient from all three
+
+Each implementation computes the Float64 gradient for the same 1000 particles, checks it
+against finite differences, and saves it. The build fails unless all three agree.
+
+```{python}
+#| label: check
+#| echo: false
+cmp = weanj.compare_gradients(EXAMPLE)
+cmp.style.hide(axis="index").format({cmp.columns[1]: "{:.6f}", cmp.columns[2]: "{:.1e}"})
+```
+
+## Timings
+
+Float32, median of 3–10 runs after warm-up, GPU synchronised. Each gradient includes
+rebuilding the cell or neighbour list. NVIDIA RTX 5000 Ada Laptop GPU and Intel
+i9-13980HX, with Enzyme on the CPU single-threaded and JAX on the CPU using XLA's
+default threading.
+
+```{python}
+#| label: plot-grad
+#| echo: false
+weanj.scaling_plot(EXAMPLE, "grad_s", "Gradient time vs number of particles")
+```
+
+```{python}
+#| label: plot-fwd
+#| echo: false
+weanj.scaling_plot(EXAMPLE, "forward_s", "Loss (forward only) time vs number of particles")
+```
+
+```{python}
+#| label: table
+#| echo: false
+N = res.N.max()
+big = res[res.N == N].copy()
+big["implementation"] = big.impl + " (" + big.device + ")"
+big["forward"] = big.forward_s.map(ms)
+big["gradient"] = big.grad_s.map(ms)
+big["gradient / forward"] = (big.grad_s / big.forward_s).map(lambda v: f"{v:.0f}×")
+big["pair slots evaluated"] = big.slots.map(lambda v: f"{v / 1e6:.0f} M")
+# Enzyme compiles once per element type (recorded at the smallest N); JAX and
+# Reactant compile once per shape.
+first_compile = res.dropna(subset=["compile_s"]).groupby(["impl", "device"]).compile_s.first()
+big["compile [s]"] = [
+    f"{c:.1f}" if not pd.isna(c) else f"{first_compile[(i, d)]:.1f}"
+    for c, i, d in zip(big.compile_s, big.impl, big.device)]
+(big[["implementation", "forward", "gradient", "gradient / forward",
+      "pair slots evaluated", "compile [s]"]]
+ .sort_values("implementation").style.hide(axis="index")
+ .set_caption(f"N = {N:,} particles"))
+```
+
+"Pair slots evaluated" counts the candidate pairs each method computes a distance for.
+Enzyme visits exactly the particles in the 3×3 cells. JAX's pair list is padded to
+1.25× the pairs found at allocation. Reactant's padded cell list reads `cap` slots per
+cell, with `cap` the largest cell occupancy.
+
+## What this shows
+
+**Differentiating the irregular algorithm works.** Enzyme differentiates the
+mutating, sort-based, data-dependent loop code directly and gets the same gradient as
+JAX and Reactant to machine precision. No padding, no capacity, no overflow check, no
+`where` tricks to keep `sqrt` finite. On the CPU at $N = 10^6$, single-threaded
+Enzyme takes `{python} ms(t("enzyme", "cpu", 10**6))` for the gradient, against
+`{python} ms(t("jax", "cpu", 10**6))` for multithreaded JAX. The forward pass alone takes
+`{python} ms(t("enzyme", "cpu", 10**6, "forward_s"))` against
+`{python} ms(t("jax", "cpu", 10**6, "forward_s"))`.
+
+**Reactant behaves like JAX.** Reactant is Julia, but compiled through XLA, and it
+needs the same regularisation: padded cells, masks, a branch-free kernel. Its gradient
+takes `{python} ms(t("reactant", "gpu", 10**6))` against JAX's
+`{python} ms(t("jax", "gpu", 10**6))`, even though its padded cell list evaluates
+`{python} f'{t("reactant", "gpu", 10**6, "slots") / t("jax", "gpu", 10**6, "slots"):.0f}'`× more pair slots than jax-md's pre-filtered pair list. The constraint comes from the
+static-graph execution model, not from the language.
+
+## Where JAX wins / where Enzyme hurts
+
+::: {.callout-warning}
+## On the GPU, today, JAX's padded version is much faster than Enzyme's
+
+At $N = 10^6$ the Enzyme GPU gradient takes `{python} ms(t("enzyme", "gpu", 10**6))`,
+`{python} f'{t("enzyme", "gpu", 10**6) / t("enzyme", "gpu", 10**6, "forward_s"):.0f}'`× its
+own forward pass. JAX takes `{python} ms(t("jax", "gpu", 10**6))`.
+
+The reason is how Enzyme compiles reverse-mode GPU kernels with a data-dependent inner
+loop: it stores values for every inner iteration in device `malloc` memory, in both the
+augmented forward kernel and the reverse kernel. With CUDA's default 8 MB device heap
+this crashes above about 30 000 particles, so the notebook raises the heap to 2 GiB.
+A branch-free kernel and a fixed-trip-count kernel showed the same behaviour.
+:::
+
+What we did not do:
+
+- **No hand-written adjoint on either side.** A JAX expert could write the neighbour
+  loop as a Pallas kernel with a hand-written backward pass. An Enzyme user could
+  restructure the GPU gradient as a forward kernel plus a gather kernel that applies
+  Enzyme only to the scalar pair function. Both are faster, and both give up "the
+  adjoint for free".
+- **No multithreaded Enzyme CPU version.** The CPU numbers are single-threaded Julia
+  against multithreaded XLA.
+- **jax-md's `capacity_multiplier` left at 1.25**, its default.

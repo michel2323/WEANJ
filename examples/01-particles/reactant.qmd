@@ -1,0 +1,134 @@
+---
+title: "01. Particles — Reactant.jl"
+engine: julia
+julia:
+  exeflags: ["+1.12", "--project=../../julia"]
+---
+
+```{julia}
+#| label: setup
+using WEANJ, Reactant, Enzyme, Printf
+include("common.jl")   # Params, kernel W, minimum image, inputs
+Reactant.set_default_backend("gpu")
+
+x0 = ensure_inputs()["x"]
+p0 = Params(size(x0, 2))
+```
+
+```{julia}
+#| label: loss
+# Reactant traces Julia array code into one XLA program, so it has JAX's constraints:
+# static shapes, no data-dependent loop bounds, no branches on traced values. The cell
+# list is regularised like a padded JAX cell list: every neighbour cell is read
+# through `cap` slots and slots past the cell's end are masked.
+
+# `W` from common.jl branches (`if q < 1`), which cannot be traced. Select instead,
+# evaluating both polynomials for every pair, as JAX's `jnp.where` does.
+@inline function W_select(r, h::T) where {T}
+    q = r / h
+    σ = T(10) / (T(7) * T(π) * h * h)
+    t = max(2 - q, zero(T))
+    return σ * ifelse(q < 1, 1 - T(1.5) * q * q + T(0.75) * q * q * q, T(0.25) * t * t * t)
+end
+
+"""
+First sorted index of each cell, using only sorts and gathers: merge the sorted cell
+ids (keys 2c) with one probe per cell (keys 2c−1); the rank of probe c, minus the
+c−1 probes before it, is the start of cell c.
+"""
+function cell_starts(cs, ncells)
+    N = length(cs)
+    probes = 2 .* Int32.(1:ncells+1) .- Int32(1)
+    order = sortperm(vcat(2 .* cs, Reactant.promote_to(typeof(cs), probes)))
+    rank = sortperm(order)                       # inverse permutation
+    return rank[N+1:end] .- Int32.(0:ncells)
+end
+
+function sph_loss_padded(x::AbstractMatrix, p::Params{T}, ::Val{cap}) where {T,cap}
+    N, nc = size(x, 2), p.nc
+    s = p.L / nc
+
+    cell = Int32(1) .+ mod.(floor.(Int32, x[1, :] ./ s), Int32(nc)) .+
+           Int32(nc) .* mod.(floor.(Int32, x[2, :] ./ s), Int32(nc))
+    perm = sortperm(cell)
+    cs = cell[perm]
+    start = cell_starts(cs, nc * nc)
+    xs, ys = x[1, perm], x[2, perm]
+    cxs, cys = (cs .- Int32(1)) .% Int32(nc), (cs .- Int32(1)) .÷ Int32(nc)
+    slots = reshape(Int32.(0:cap-1), cap, 1)
+
+    ρ = zero(xs)
+    for dy in -1:1, dx in -1:1                   # unrolled at trace time
+        cn = Int32(1) .+ mod.(cxs .+ Int32(dx), Int32(nc)) .+
+             Int32(nc) .* mod.(cys .+ Int32(dy), Int32(nc))
+        idx = reshape(start[cn], 1, N) .+ slots                  # (cap, N) candidates
+        valid = idx .< reshape(start[cn .+ Int32(1)], 1, N)
+        l = clamp.(idx, Int32(1), Int32(N))
+        rx = minimg.(reshape(xs, 1, N) .- xs[l], p.L)
+        ry = minimg.(reshape(ys, 1, N) .- ys[l], p.L)
+        r2 = rx .^ 2 .+ ry .^ 2
+        inside = valid .& (r2 .< 4 * p.h * p.h)
+        r = sqrt.(ifelse.(inside, r2, one(T)))  # keep sqrt' finite on masked slots
+        ρ = ρ .+ vec(sum(ifelse.(inside, p.m .* W_select.(r, p.h), zero(T)); dims=1))
+    end
+    return sum((ρ .- p.ρ0) .^ 2)
+end
+
+"Capacity needed: the largest cell occupancy. Too small silently drops neighbours."
+function max_occupancy(x, p)
+    s, nc = p.L / p.nc, p.nc
+    counts = zeros(Int, nc * nc)
+    for i in axes(x, 2)
+        counts[1 + mod(floor(Int, x[1, i] / s), nc) + nc * mod(floor(Int, x[2, i] / s), nc)] += 1
+    end
+    return maximum(counts)
+end
+```
+
+```{julia}
+#| label: grad
+sph_gradient_padded(x, p, cap) =
+    Enzyme.gradient(Reverse, Const(sph_loss_padded), x, Const(p), Const(cap))[1]
+
+cap0 = Val(max_occupancy(x0, p0))
+xr0 = Reactant.to_rarray(x0)
+loss_c = @compile sph_loss_padded(xr0, p0, cap0)
+grad_c = @compile sph_gradient_padded(xr0, p0, cap0)
+g = Array(grad_c(xr0, p0, cap0))
+@printf "cap = %d   loss = %.10f   ‖∇loss‖ = %.6f\n" max_occupancy(x0, p0) Float64(loss_c(xr0, p0, cap0)) sqrt(sum(abs2, g))
+```
+
+```{julia}
+#| label: check
+err = fd_check(y -> Float64(loss_c(Reactant.to_rarray(y), p0, cap0)), x0, g; n=10)
+save_gradient(EXAMPLE, "reactant", g)
+@printf "finite differences: max rel. error %.1e on 10 components\n" err
+```
+
+```{julia}
+#| label: bench
+Ns = [10^3, 10^4, 10^5, 10^6]
+records = []
+for N in Ns
+    p = Params{Float32}(N)
+    xh = positions(Float32, N)
+    ncap = max_occupancy(xh, p)
+    cap = Val(ncap)
+    x = Reactant.to_rarray(xh)
+    compile_s = @elapsed begin
+        lf = @compile sph_loss_padded(x, p, cap)
+        gf = @compile sph_gradient_padded(x, p, cap)
+    end
+    samples = N >= 10^5 ? 3 : 10
+    push!(records, (; dtype="Float32", N,
+        forward_s = time_median(() -> lf(x, p, cap); sync=Reactant.synchronize, samples),
+        grad_s    = time_median(() -> gf(x, p, cap); sync=Reactant.synchronize, samples),
+        compile_s, peak_mem_bytes = nothing,
+        slots = 9 * ncap * N))
+end
+write_results(EXAMPLE, "reactant", "gpu", records)
+
+for r in records
+    @printf "gpu  N=%-8d forward %9.3f ms   gradient %9.3f ms   compile %6.1f s\n" r.N 1e3r.forward_s 1e3r.grad_s r.compile_s
+end
+```

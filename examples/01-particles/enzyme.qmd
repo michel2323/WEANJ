@@ -1,0 +1,228 @@
+---
+title: "01. Particles — Enzyme.jl"
+engine: julia
+julia:
+  exeflags: ["+1.12", "--project=../../julia"]
+---
+
+```{julia}
+#| label: setup
+using WEANJ, Enzyme, CUDA, KernelAbstractions, Printf
+include("common.jl")   # Params, kernel W, minimum image, inputs
+
+# Enzyme's reverse-mode GPU kernels store per-iteration values of data-dependent
+# loops in device `malloc` memory. CUDA's default device heap is 8 MB, which overflows
+# above ~30k particles (illegal memory access). Must be set before the first kernel.
+CUDA.limit!(CUDA.LIMIT_MALLOC_HEAP_SIZE, 2^31)
+
+x0 = ensure_inputs()["x"]    # shared Float64 correctness input, 2×1000
+p0 = Params(size(x0, 2))
+```
+
+```{julia}
+#| label: loss-cpu
+# The whole pipeline is differentiated: cell ids, counting sort, gather into sorted
+# order, and neighbour loops whose ranges depend on the data.
+function sph_loss(x::AbstractMatrix{T}, p::Params{T}) where {T}
+    N, nc = size(x, 2), p.nc
+    s, rc = p.L / nc, 2 * p.h
+
+    # 1. cell id of every particle, and particles per cell
+    cell  = Vector{Int}(undef, N)
+    start = zeros(Int, nc * nc + 1)
+    @inbounds for i in 1:N
+        cx = mod(floor(Int, x[1, i] / s), nc)
+        cy = mod(floor(Int, x[2, i] / s), nc)
+        cell[i] = 1 + cx + nc * cy
+        start[cell[i] + 1] += 1
+    end
+
+    # 2. counting sort by cell: start[c] is the first sorted index of cell c
+    start[1] = 1
+    for c in 1:nc * nc
+        start[c + 1] += start[c]
+    end
+    cursor = start[1:end-1]
+    perm = Vector{Int}(undef, N)
+    @inbounds for i in 1:N
+        perm[cursor[cell[i]]] = i
+        cursor[cell[i]] += 1
+    end
+
+    # 3. gather positions into sorted order: each cell is contiguous in memory
+    xs = similar(x)
+    @inbounds for k in 1:N
+        xs[1, k] = x[1, perm[k]]
+        xs[2, k] = x[2, perm[k]]
+    end
+
+    # 4. density and loss over the 3×3 neighbouring cells; each cell is the range
+    #    start[c]:start[c+1]-1, whose length depends on the data
+    loss = zero(T)
+    @inbounds for k in 1:N
+        c = cell[perm[k]] - 1
+        cx, cy = c % nc, c ÷ nc
+        ρ = zero(T)
+        for dy in -1:1, dx in -1:1
+            cn = 1 + mod(cx + dx, nc) + nc * mod(cy + dy, nc)
+            for l in start[cn]:start[cn + 1] - 1
+                rx = minimg(xs[1, k] - xs[1, l], p.L)
+                ry = minimg(xs[2, k] - xs[2, l], p.L)
+                r2 = rx * rx + ry * ry
+                if r2 < rc * rc
+                    ρ += p.m * W(sqrt(r2), p.h)
+                end
+            end
+        end
+        loss += (ρ - p.ρ0)^2
+    end
+    return loss
+end
+```
+
+```{julia}
+#| label: grad-cpu
+function sph_gradient(x::Matrix{T}, p::Params{T}) where {T}
+    dx = zero(x)
+    Enzyme.autodiff(Reverse, sph_loss, Active, Duplicated(x, dx), Const(p))
+    return dx
+end
+
+g_cpu = sph_gradient(x0, p0)
+@printf "loss = %.10f   ‖∇loss‖ = %.6f\n" sph_loss(x0, p0) sqrt(sum(abs2, g_cpu))
+```
+
+```{julia}
+#| label: loss-gpu
+# Same algorithm as KernelAbstractions kernels. The cell list is integer-valued (zero
+# derivative), so it is built outside the differentiated function with CUDA.jl's sort.
+# The gather and the neighbour loops are differentiated.
+
+# Box size, smoothing length etc. are not differentiated; declaring that lets Params be
+# passed to GPU kernels, which reject active (differentiable) scalar arguments.
+Enzyme.EnzymeRules.inactive_type(::Type{<:Params}) = true
+
+@kernel function cell_ids!(cell, counts, @Const(x), s, nc)
+    i = @index(Global)
+    @inbounds begin
+        cx = mod(unsafe_trunc(Int32, floor(x[1, i] / s)), Int32(nc))
+        cy = mod(unsafe_trunc(Int32, floor(x[2, i] / s)), Int32(nc))
+        cell[i] = Int32(1) + cx + Int32(nc) * cy
+        KernelAbstractions.@atomic counts[cell[i] + 1] += Int32(1)
+    end
+end
+
+function build_cells(x::CuMatrix{T}, p::Params{T}) where {T}
+    N, nc = size(x, 2), p.nc
+    cell = CuVector{Int32}(undef, N)
+    counts = CUDA.zeros(Int32, nc * nc + 1)
+    cell_ids!(get_backend(x))(cell, counts, x, p.L / nc, nc; ndrange=N)
+    counts[1:1] .= 1
+    perm = sortperm(cell)
+    return (; perm=Int32.(perm), cell=cell[perm], start=cumsum(counts))
+end
+
+@kernel function gather!(xs, @Const(x), @Const(perm))
+    k = @index(Global)
+    @inbounds xs[1, k] = x[1, perm[k]]
+    @inbounds xs[2, k] = x[2, perm[k]]
+end
+
+@kernel function density_loss!(e, @Const(xs), @Const(cellk), @Const(start), p)
+    k = @index(Global)
+    T, nc = eltype(xs), Int32(p.nc)
+    @inbounds begin
+        c = cellk[k] - Int32(1)
+        cx, cy = c % nc, c ÷ nc
+        ρ = zero(T)
+        for dy in Int32(-1):Int32(1), dx in Int32(-1):Int32(1)
+            cn = Int32(1) + mod(cx + dx, nc) + nc * mod(cy + dy, nc)
+            for l in start[cn]:start[cn + 1] - Int32(1)      # data-dependent range
+                rx = minimg(xs[1, k] - xs[1, l], p.L)
+                ry = minimg(xs[2, k] - xs[2, l], p.L)
+                r2 = rx * rx + ry * ry
+                if r2 < 4 * p.h * p.h
+                    ρ += p.m * W(sqrt(r2), p.h)
+                end
+            end
+        end
+        e[k] = (ρ - p.ρ0)^2
+    end
+end
+
+"Per-particle loss terms e (in sorted order); the loss is sum(e)."
+function sph_terms!(e, xs, x, cells, p)
+    backend, N = get_backend(x), size(x, 2)
+    gather!(backend)(xs, x, cells.perm; ndrange=N)
+    density_loss!(backend)(e, xs, cells.cell, cells.start, p; ndrange=N)
+    return nothing
+end
+
+function sph_loss(x::CuMatrix{T}, p::Params{T}) where {T}
+    e, xs = similar(x, size(x, 2)), similar(x)
+    sph_terms!(e, xs, x, build_cells(x, p), p)
+    return sum(e)
+end
+```
+
+```{julia}
+#| label: grad-gpu
+"Gradient of sum(e): reverse mode seeded with de = 1."
+function sph_gradient(x::CuMatrix{T}, p::Params{T}) where {T}
+    N = size(x, 2)
+    e, de = similar(x, N), CUDA.ones(T, N)
+    xs, dxs = similar(x), CUDA.zeros(T, size(x))
+    dx = CUDA.zeros(T, size(x))
+    Enzyme.autodiff(Reverse, sph_terms!, Const,
+                    Duplicated(e, de), Duplicated(xs, dxs), Duplicated(x, dx),
+                    Const(build_cells(x, p)), Const(p))
+    return dx
+end
+
+g_gpu = Array(sph_gradient(CuArray(x0), p0))
+@printf "max |∇_gpu − ∇_cpu| / max |∇_cpu| = %.1e\n" maximum(abs, g_gpu - g_cpu) / maximum(abs, g_cpu)
+```
+
+```{julia}
+#| label: check
+err = fd_check(y -> sph_loss(y, p0), x0, g_cpu; n=10)
+@assert maximum(abs, g_gpu - g_cpu) <= 1e-12 * maximum(abs, g_cpu)
+save_gradient(EXAMPLE, "enzyme", g_cpu)
+@printf "finite differences: max rel. error %.1e on 10 components\n" err
+```
+
+```{julia}
+#| label: bench
+"Neighbour candidates visited: Σ over particles of the occupancy of its 3×3 cells."
+function slots_visited(x, p)
+    s, nc = p.L / p.nc, p.nc
+    occ = zeros(Int, nc, nc)
+    for i in axes(x, 2)
+        occ[1 + mod(floor(Int, x[1, i] / s), nc), 1 + mod(floor(Int, x[2, i] / s), nc)] += 1
+    end
+    return sum(occ[i, j] * sum(occ[mod1(i + a, nc), mod1(j + b, nc)] for a in -1:1, b in -1:1)
+               for i in 1:nc, j in 1:nc)
+end
+
+Ns = [10^3, 10^4, 10^5, 10^6]
+gpu_sync = _ -> CUDA.synchronize()
+records = Dict("cpu" => [], "gpu" => [])
+for (device, prep, sync) in (("cpu", identity, identity), ("gpu", CuArray, gpu_sync))
+    for (n, N) in enumerate(Ns)
+        p = Params{Float32}(N)
+        x = prep(positions(Float32, N))
+        samples = N >= 10^5 ? 3 : 10
+        compile_s = n == 1 ? @elapsed(sync(sph_gradient(x, p))) : nothing
+        push!(records[device], (; dtype="Float32", N,
+            forward_s = time_median(() -> sph_loss(x, p); sync, samples),
+            grad_s    = time_median(() -> sph_gradient(x, p); sync, samples),
+            compile_s, peak_mem_bytes = nothing,
+            slots = slots_visited(Array(x), p)))
+    end
+    write_results(EXAMPLE, "enzyme", device, records[device])
+end
+
+for d in ("cpu", "gpu"), r in records[d]
+    @printf "%s  N=%-8d forward %9.3f ms   gradient %9.3f ms\n" d r.N 1e3r.forward_s 1e3r.grad_s
+end
+```

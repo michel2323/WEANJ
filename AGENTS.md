@@ -234,11 +234,12 @@ Format: `- [ ] task — YYYY-MM-DD note`. Mark `[x]` when done; keep the note to
 - [x] GitHub Actions publish workflow; empty site live — 2026-10-14 https://michel2323.github.io/WEANJ/ ; needed a pre-created empty `gh-pages` branch + Pages enabled via API; frozen Julia pages render on the runner without Julia (open question closed)
 
 ### Phase 2 — Example 1 (particles)
-- [ ] Data generation
-- [ ] Enzyme implementation (CPU + GPU) + FD check
+- [x] Data generation — 2026-10-14 `examples/01-particles/common.jl` (`ensure_inputs`, N_CHECK=1000, seed 42); problem: periodic 2D box, cubic spline h=0.5, ~31 neighbours
+- [x] Enzyme implementation CPU + FD check — 2026-10-14 `enzyme_impl.jl`: whole pipeline differentiated (counting sort, gather, dynamic neighbour loops); loss = brute force to 4e-12; FD 5e-8; 4.7 ms grad at N=1000
+- [~] Enzyme implementation GPU — 2026-10-14 KA kernels; gradient = CPU to 4e-16. Needed `inactive_type(Params)` (KA rejects active scalar kernel args). **BLOCKER:** reverse kernel stores per-iteration tape via in-kernel malloc → crashes above ~30k particles with default 8 MB device heap; with `CUDA.limit!(LIMIT_MALLOC_HEAP_SIZE, 2^31)` works but N=1e6 grad = 1040 ms (aug_fwd 511 ms + rev 509 ms) vs forward 7.9 ms. Branch-free (`ifelse`) and fixed-trip-count variants still malloc. Awaiting user decision / Enzyme dev input.
 - [ ] Reactant implementation + check
-- [ ] JAX implementation + check
-- [ ] Cross-implementation gradient agreement
+- [x] JAX implementation + check — 2026-10-14 `jax_impl.py`: jax-md Sparse neighbour list + segment_sum, overflow re-allocate outside jit; FD 2.5e-8; N=1e5 grad 7.3 ms, N=1e6 grad 62 ms (capacity 39M pair slots)
+- [x] Cross-implementation gradient agreement (Enzyme vs JAX) — 2026-10-14 max rel. diff 1.1e-15
 - [ ] Timings + memory + scaling plot
 - [ ] Host page written; rendered and published
 
